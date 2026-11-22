@@ -8,12 +8,12 @@ code safely.
 
 - **Aura**: a Qt 6 / QML coaching app with two roles, **coach** and **client**, in one
   app. Desktop first, on **macOS and Windows**; iOS and Android later with the same QML.
-- **Phase 0** (interactive prototype) is essentially done. The app still runs on
-  in-memory QML singletons with sample data in `qml/services/`.
+- **Phase 0** (interactive prototype) is essentially done.
 - **Phase 1** (Supabase backend) is **done**: schema, row-level security, rules and
-  demo data are live (see "Backend"), but the app doesn't use them yet.
-- **Next step: Phase 2**, a C++ `SupabaseClient`, with each store replaced by a
-  C++ class exposing the same API.
+  demo data are live (see "Backend").
+- **Phase 2 in progress**: a C++ `SupabaseClient`, with each store replaced by a
+  C++ class exposing the same API. `Session` and `ProgramStore` are done; the
+  other stores are still in-memory QML singletons in `qml/services/`.
 - Qt **6.12.0** on both of the developer's machines (see below).
   `qt_standard_project_setup(REQUIRES 6.10)`.
 - **The project must build and run on both macOS and Windows.** Don't add
@@ -103,6 +103,12 @@ Pitfalls with the offscreen platform:
   `delete from auth.users where email like 'signup-test-%'`).
 - The driver's `main.cpp` must create the `SupabaseClient` before the engine,
   like the real `main.cpp`.
+- To run QML from the driver, use `QQmlExpression(qmlContext(window), window, code)`:
+  that context sees the module's singletons and `Main.qml` ids (`router`); the
+  engine's root context doesn't. JS globals don't persist between expressions.
+- The Windows PC has no Python (the `python` command opens the Store); Perl
+  comes with Git for Windows. Long heredocs with quotes can break the Bash
+  tool; write scripts to files instead.
 - Never put this driver into the project.
 
 ## Backend (Phase 1 done, Phase 2 next)
@@ -135,9 +141,14 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
     Clients get a coach's busy times without details from `coach_busy()`.
   - Seed: the prototype's people, programs and calendar as real accounts, all with
     password `password`. Sample coaches can't answer (no auto-accept).
-- **App** (Phase 2, in progress). Done: `SupabaseClient` + `Session` (real
-  login/signup). The other stores are still the QML mocks; they find the user
-  by `Session.user.email`, which still matches the seeded accounts.
+- **App** (Phase 2, in progress). Done: `SupabaseClient`, `Session` (real
+  login/signup), `ProgramStore` (programs + exercises). `ClientStore`,
+  `CoachStore`, `CalendarStore` are still the QML mocks; they find the user by
+  `Session.user.email`, which still matches the seeded accounts.
+  - `ClientStore.qml` has a **temporary `_programBridge`** that points its sample
+    assignments (numeric program ids) at the real programs by name. Delete it
+    when ClientStore moves to C++.
+  - Program and exercise ids are UUID strings; `""` means "new" (was `0`).
   - C++ lives in `src/` (`supabase/` client, `models/` value types, `stores/`
     QML singletons). **Every new C++ file goes in `SOURCES` of
     `qt_add_qml_module`**, and its folder in `target_include_directories`.
@@ -148,6 +159,25 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
   - Stores call `SupabaseClient::instance()->select / insert / update / remove / rpc`
     with `this` as context; `Reply::errorCode` is the SQL function's error code
     (e.g. `slot_unavailable`), an Auth `error_code`, or `network`.
+  - Store pattern (see `ProgramStore`): load on `SupabaseClient::sessionChanged`
+    when the user id changes (it also fires on token refresh), clear on logout;
+    writes update the local list first, then the server; on error emit
+    `errorOccurred(message)` (shown by the toast in `Main.qml`) and reload.
+  - **C++ store functions don't make QML bindings depend on store data.** A
+    binding like `ProgramStore.searchExercises(text, muscle)` only re-runs when
+    its arguments change. Each C++ store has a `revision` property; bindings
+    that call a function reading store data pass it last:
+    `ProgramStore.searchExercises(text, muscle, ProgramStore.revision)`.
+    Reading list properties directly (`ProgramStore.programs.find(...)`) is fine.
+  - **Editor drafts must be real JS objects.** Return them as `QJSValue` built
+    from a `QJsonObject` (`engine->toScriptValue(QJsonObject::fromVariantMap(m))`).
+    A `QVariantMap` (or `toScriptValue(QVariantMap)`) gives list wrappers that
+    copy elements on read, so in-place edits stop reaching the day cards and rows.
+  - Value types (`Q_GADGET` + `QML_VALUE_TYPE(lowercaseName)`) in `src/models`;
+    `QList<Gadget>` properties work as Repeater models and support `find`,
+    `some`, `filter`, `sort` in QML. Functions taking either a gadget or a JS
+    draft use `QVariant` and `T::fromVariant()`.
+  - AUTOMOC only notices `Q_OBJECT` / `Q_GADGET` at the start of a line.
   - **Full C++ stores** (user's choice, wants C++ and future unit tests): each store
     becomes a C++ QML singleton with the same functions, so screens change little.
   - Data reaches QML as **typed value types** (`Q_GADGET` structs), so screens keep
@@ -186,7 +216,7 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
 |---|---|
 | `Session` | **C++** (`src/stores/session.*`), Supabase Auth: `login`, `signup`, `logout`, `user {id,name,email,role}` (`AuraUser` value type, empty id when logged out), `busy`, `lastError` |
 | `ClientStore` | The demo coach's clients + program assignments, program status (`none`/`scheduled`/`active`/`endingSoon`/`expired`), invite / activate / remove, assign / extend / end |
-| `ProgramStore` | Programs (days → exercise entries) and exercise library. Per-week changes. Display helpers |
+| `ProgramStore` | **C++** (`src/stores/programstore.*`, models in `src/models/program.*`): programs (days → exercise entries) and exercise library (built-in = read-only), per-week changes, display helpers. Editor drafts are JS objects |
 | `CalendarStore` | Demo coach's working hours + blocked slots, all sessions/bookings, slot states, booking rules |
 | `CoachStore` | Coach directory (6 sample coaches), public/private, coach–client relations (requests, invitations), `myRelation` / `myCoach` for the logged-in client |
 | `MockData` | Leftover sample content for dashboards (stats, today checklist, goals, coach message) |

@@ -22,9 +22,9 @@ Rectangle {
         const day = program && dayIndex < program.days.length ? program.days[dayIndex] : null
         return day && entryIndex < day.exercises.length
                ? day.exercises[entryIndex]
-               : ({ exerciseId: 0, sets: "", reps: "", load: "", rest: "", notes: "", weeks: {} })
+               : ({ exerciseId: "", sets: "", reps: "", load: "", rest: "", notes: "", weeks: {} })
     }
-    readonly property var exercise: ProgramStore.exerciseById(entry.exerciseId)
+    readonly property var exercise: ProgramStore.exerciseById(entry.exerciseId, ProgramStore.revision)
     readonly property var changedKeys: ProgramStore.changedKeys(entry, week, revision)
     readonly property var changedWeeks: ProgramStore.entryChangedWeeks(entry, revision)
 

@@ -14,8 +14,8 @@ import QtQuick.Controls.Basic
 Item {
     id: editor
 
-    property int programId: 0               // 0 = new program
-    property var draft: ({ id: 0, name: "", description: "", weeks: "", updatedAt: 0, days: [] })
+    property string programId: ""            // "" = new program
+    property var draft: ({ id: "", name: "", description: "", weeks: "", updatedAt: 0, days: [] })
     property int revision: 0
     property int week: 0                    // 0 = all weeks
     property bool dirty: false
@@ -29,10 +29,10 @@ Item {
     property bool returnOnClose: false
 
     // Another program asked to open while this one has unsaved changes
-    property int pendingSwitchId: 0
+    property string pendingSwitchId: ""
     property string pendingSwitchBackText: ""
 
-    readonly property bool isNew: draft.id === 0
+    readonly property bool isNew: draft.id === ""
     readonly property bool wide: width >= 760
     readonly property int totalExercises: ProgramStore.exerciseCount(draft)
     readonly property int weekCount: ProgramStore.weekCount(draft, revision)
@@ -40,10 +40,10 @@ Item {
     readonly property int clientCount: ClientStore.countForProgram(draft.id)
 
     signal closeRequested()
-    signal switchRequested(int programId, string backText)
+    signal switchRequested(string programId, string backText)
 
     Component.onCompleted: {
-        draft = programId !== 0 ? ProgramStore.cloneProgram(programId) : ProgramStore.newProgramDraft()
+        draft = programId !== "" ? ProgramStore.cloneProgram(programId) : ProgramStore.newProgramDraft()
     }
 
     onWeekCountChanged: {
@@ -163,7 +163,7 @@ Item {
     }
 
     function requestClose() {
-        pendingSwitchId = 0
+        pendingSwitchId = ""
         if (dirty)
             discardDialog.open()
         else
@@ -456,7 +456,7 @@ Item {
         confirmText: qsTr("Discard")
         destructive: true
         onConfirmed: {
-            if (editor.pendingSwitchId !== 0)
+            if (editor.pendingSwitchId !== "")
                 editor.switchRequested(editor.pendingSwitchId, editor.pendingSwitchBackText)
             else
                 editor.closeRequested()

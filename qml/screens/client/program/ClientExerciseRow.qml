@@ -7,12 +7,12 @@ import QtQuick.Controls.Basic
 AbstractButton {
     id: row
 
-    property var entry: ({ exerciseId: 0, sets: "", reps: "", load: "", rest: "", notes: "", weeks: {} })
+    property var entry: ({ exerciseId: "", sets: "", reps: "", load: "", rest: "", notes: "", weeks: {} })
     property int position: 1
     property int week: 1
     property bool wide: true
 
-    readonly property var exercise: ProgramStore.exerciseById(entry.exerciseId)
+    readonly property var exercise: ProgramStore.exerciseById(entry.exerciseId, ProgramStore.revision)
     readonly property string prescription: ProgramStore.prescriptionText(entry, week)
     readonly property string load: ProgramStore.effective(entry, week, "load")
     readonly property string rest: ProgramStore.restText(entry.rest)

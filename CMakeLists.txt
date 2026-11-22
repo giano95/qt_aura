@@ -28,7 +28,6 @@ qt_add_executable(appqt_aura
 set(AURA_QML_SINGLETONS
     qml/theme/Theme.qml
     qml/services/MockData.qml
-    qml/services/ProgramStore.qml
     qml/services/ClientStore.qml
     qml/services/CalendarStore.qml
     qml/services/CoachStore.qml
@@ -43,7 +42,9 @@ qt_add_qml_module(appqt_aura
     SOURCES
         src/supabase/supabaseclient.h src/supabase/supabaseclient.cpp
         src/models/aurauser.h
+        src/models/program.h src/models/program.cpp
         src/stores/session.h src/stores/session.cpp
+        src/stores/programstore.h src/stores/programstore.cpp
     QML_FILES
         Main.qml
         ${AURA_QML_SINGLETONS}

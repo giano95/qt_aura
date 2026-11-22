@@ -6,8 +6,8 @@ import QtQuick.Controls.Basic
 AbstractButton {
     id: card
 
-    property var exercise: ({ id: 0, name: "", muscle: "", equipment: "", instructions: "" })
-    readonly property int usage: ProgramStore.usageCount(exercise.id)
+    property var exercise: ({ id: "", name: "", muscle: "", equipment: "", instructions: "", builtIn: false })
+    readonly property int usage: ProgramStore.usageCount(exercise.id, ProgramStore.revision)
 
     hoverEnabled: true
     padding: 18
@@ -30,6 +30,7 @@ AbstractButton {
 
             Chip { text: card.exercise.muscle; tone: "primary" }
             Chip { text: card.exercise.equipment }
+            Chip { visible: !card.exercise.builtIn; text: qsTr("Custom"); tone: "accent" }
         }
         Label {
             visible: text.length > 0

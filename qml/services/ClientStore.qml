@@ -334,6 +334,32 @@ QtObject {
         clients = list
     }
 
+    // TEMPORARY, until ClientStore moves to C++ and Supabase: the sample
+    // assignments below use the prototype's numeric program ids, while
+    // ProgramStore now loads real programs (UUIDs). Point them at the real
+    // program with the same name.
+    property Connections _programBridge: Connections {
+        target: ProgramStore
+        function onRevisionChanged() {
+            store._linkPrograms()
+        }
+    }
+    function _linkPrograms() {
+        const byName = {}
+        ProgramStore.programs.forEach(p => byName[p.name] = p.id)
+        let changed = false
+        const list = JSON.parse(JSON.stringify(clients))
+        list.forEach(c => c.assignments.forEach(a => {
+            const id = byName[a.programName]
+            if (id && a.programId !== id) {
+                a.programId = id
+                changed = true
+            }
+        }))
+        if (changed)
+            clients = list
+    }
+
     Component.onCompleted: {
         let nextAssignmentId = 1
         // Assignment that started `daysAgo` days ago
@@ -384,5 +410,6 @@ QtObject {
                 a(...home, 2) ]),
             c(12, "Laura Ricci", "laura.ricci@example.com", "", "", "invited", 2, null, null, [])
         ]
+        _linkPrograms()
     }
 }

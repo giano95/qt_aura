@@ -8,10 +8,11 @@ sessions in the coach's free time.
 One app, two roles: after login the app opens the **coach app** or the
 **client app** depending on the account.
 
-> **Status: moving to the backend (Phase 2).** Login and signup use real
-> Supabase accounts (an internet connection is needed). The rest of the data
-> still lives in memory (QML singletons with sample data) and resets when the
-> app closes, until each store moves to the backend. See [Roadmap](#roadmap).
+> **Status: moving to the backend (Phase 2).** Login, signup, programs and the
+> exercise library use real Supabase data (an internet connection is needed).
+> Clients, coaching requests and the calendar still live in memory (QML
+> singletons with sample data) and reset when the app closes, until each store
+> moves to the backend. See [Roadmap](#roadmap).
 
 ---
 
@@ -113,13 +114,13 @@ Main.qml                Window + router: auth flow / coach app / client app
 src/                    C++ (Phase 2)
   supabase/               SupabaseClient: auth, token refresh, tables, RPC calls
   models/                 value types QML reads (AuraUser, …)
-  stores/                 C++ stores, QML singletons: Session (login / signup / logout)
+  stores/                 C++ stores, QML singletons: Session (login / signup / logout),
+                          ProgramStore (programs, exercise library)
 supabase/               Database: migrations/ (schema, rules, RLS) and seed.sql (demo data)
 qml/
   theme/Theme.qml       Design tokens (colors, radii, font sizes), light/dark
   services/             In-memory data (QML singletons), moving to C++ one by one
     ClientStore.qml       the coach's clients and program assignments
-    ProgramStore.qml      programs (days, exercises, per-week values) and exercise library
     CalendarStore.qml     working hours, blocked slots, sessions and bookings
     CoachStore.qml        coach directory, public/private, coach–client requests and invitations
     MockData.qml          leftover sample content for the dashboards
@@ -147,8 +148,8 @@ stay as they are. All styling comes from `Theme`, and all controls use
 | Phase | What | Status |
 |---|---|---|
 | 0 | Scope and design every screen in QML, with sample data | **Mostly done.** Messages and Progress are still to design |
-| 1 | Backend: Supabase (Postgres) in an EU region, row-level security, auth, migrations in git | **Done.** Schema, rules and demo data in `supabase/`; the app doesn't use it yet |
-| 2 | Qt ↔ backend: C++ `SupabaseClient` (HTTPS / JSON / tokens), replace stores with C++; QtKeychain later | Not started |
+| 1 | Backend: Supabase (Postgres) in an EU region, row-level security, auth, migrations in git | **Done.** Schema, rules and demo data in `supabase/` |
+| 2 | Qt ↔ backend: C++ `SupabaseClient` (HTTPS / JSON / tokens), replace stores with C++; QtKeychain later | **In progress.** Done: `SupabaseClient`, `Session`, `ProgramStore`. Next: `ClientStore` + `CoachStore`, then `CalendarStore` |
 | 3 | Remaining core features on real data (messages, progress, session notes) | Not started |
 | 4 | Offline: SQLite cache, sync queue | Not started |
 | 5 | Desktop release: packaging, code signing, CI installers | Not started |

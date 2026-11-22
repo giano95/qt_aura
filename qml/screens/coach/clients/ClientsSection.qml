@@ -8,7 +8,7 @@ import QtQuick.Controls.Basic
 StackView {
     id: stack
 
-    signal openProgramRequested(int programId, string clientName)
+    signal openProgramRequested(string programId, string clientName)
 
     initialItem: listComponent
 

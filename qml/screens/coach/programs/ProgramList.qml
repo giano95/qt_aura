@@ -8,9 +8,9 @@ import QtQuick.Controls.Basic
 ColumnLayout {
     id: root
 
-    signal editRequested(int programId)
+    signal editRequested(string programId)
 
-    readonly property var results: ProgramStore.searchPrograms(search.text)
+    readonly property var results: ProgramStore.searchPrograms(search.text, ProgramStore.revision)
     readonly property int columns: Math.max(1, Math.min(3, Math.floor((width + 16) / 316)))
 
     spacing: 16
@@ -61,7 +61,7 @@ ColumnLayout {
             Layout.preferredWidth: 1
             Layout.minimumHeight: 180
             hoverEnabled: true
-            onClicked: root.editRequested(0)
+            onClicked: root.editRequested("")
 
             contentItem: ColumnLayout {
                 spacing: 6

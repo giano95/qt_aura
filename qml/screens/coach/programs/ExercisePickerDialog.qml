@@ -14,9 +14,9 @@ AuraDialog {
     property var addedCounts: ({})       // exerciseId -> times added while open
     property int addedTotal: 0
 
-    readonly property var results: ProgramStore.searchExercises(search.text, muscle)
+    readonly property var results: ProgramStore.searchExercises(search.text, muscle, ProgramStore.revision)
 
-    signal picked(int exerciseId)
+    signal picked(string exerciseId)
     signal createRequested(string name)
 
     function openFor(name) {

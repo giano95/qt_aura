@@ -6,7 +6,7 @@ import QtQuick.Controls.Basic
 ScrollView {
     id: page
 
-    signal editRequested(int programId)
+    signal editRequested(string programId)
 
     contentWidth: availableWidth
     padding: width < 600 ? 16 : 32
@@ -22,7 +22,7 @@ ScrollView {
 
             AuraButton {
                 text: qsTr("New program")
-                onClicked: page.editRequested(0)
+                onClicked: page.editRequested("")
             }
         }
 

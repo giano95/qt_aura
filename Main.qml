@@ -63,4 +63,15 @@ ApplicationWindow {
         id: clientApp
         ClientHome {}
     }
+
+    // Errors from the C++ stores (a refused change, no connection, ...)
+    Toast {
+        id: errorToast
+    }
+    Connections {
+        target: ProgramStore
+        function onErrorOccurred(message) {
+            errorToast.show(message)
+        }
+    }
 }

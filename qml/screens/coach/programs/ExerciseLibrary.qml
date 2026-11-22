@@ -10,7 +10,7 @@ ColumnLayout {
 
     property string muscle: ""          // "" = all groups
 
-    readonly property var results: ProgramStore.searchExercises(search.text, muscle)
+    readonly property var results: ProgramStore.searchExercises(search.text, muscle, ProgramStore.revision)
     readonly property int columns: Math.max(1, Math.min(3, Math.floor((width + 16) / 296)))
 
     function createExercise(name) {
@@ -51,7 +51,7 @@ ColumnLayout {
             FilterChip {
                 required property string modelData
                 text: modelData
-                count: String(ProgramStore.countByMuscle(modelData))
+                count: String(ProgramStore.countByMuscle(modelData, ProgramStore.revision))
                 selected: root.muscle === modelData
                 onClicked: root.muscle = modelData
             }

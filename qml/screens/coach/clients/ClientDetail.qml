@@ -19,7 +19,7 @@ Item {
     readonly property bool hasRunningProgram: status.kind === "active" || status.kind === "endingSoon" || status.kind === "scheduled"
 
     signal closeRequested()
-    signal openProgramRequested(int programId, string clientName)
+    signal openProgramRequested(string programId, string clientName)
 
     function programExists(programId) {
         return ProgramStore.programs.some(p => p.id === programId)

@@ -9,7 +9,7 @@ AuraDialog {
     id: dialog
 
     property int clientId: 0
-    property int programId: 0
+    property string programId: ""
     property double startMs: ClientStore.today()
     property bool submitted: false
 
@@ -19,13 +19,13 @@ AuraDialog {
     readonly property var current: client ? ClientStore.programStatus(client) : ({ kind: "none", assignment: null })
     readonly property double endMs: program ? ClientStore.lastDay({ start: startMs, weeks: weeks }) : 0
     readonly property bool twoColumns: availableWidth >= 640
-    readonly property var programs: ProgramStore.searchPrograms(search.text)
+    readonly property var programs: ProgramStore.searchPrograms(search.text, ProgramStore.revision)
 
     signal assigned(string clientName, string programName)
 
     function openFor(id, preselectProgramId) {
         clientId = id
-        programId = preselectProgramId || 0
+        programId = preselectProgramId ? String(preselectProgramId) : ""
         startMs = ClientStore.today()
         search.text = ""
         noteField.text = ""

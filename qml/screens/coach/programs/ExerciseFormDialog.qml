@@ -8,31 +8,34 @@ import QtQuick.Controls.Basic
 AuraDialog {
     id: dialog
 
-    property int exerciseId: 0
+    property string exerciseId: ""
+    // Built-in library exercises are read-only
+    property bool builtIn: false
     property string muscle: ""
     property string equipment: ""
     property string presetMuscle: ""        // preselected group for new exercises
     property bool submitted: false
 
-    readonly property bool isNew: exerciseId === 0
-    readonly property int usage: exerciseId !== 0 ? ProgramStore.usageCount(exerciseId) : 0
+    readonly property bool isNew: exerciseId === ""
+    readonly property int usage: exerciseId !== "" ? ProgramStore.usageCount(exerciseId, ProgramStore.revision) : 0
 
     readonly property string nameError: {
         if (!submitted)
             return ""
         if (nameField.text.trim().length === 0)
             return qsTr("Enter a name.")
-        if (ProgramStore.isExerciseNameTaken(nameField.text, exerciseId))
+        if (ProgramStore.isExerciseNameTaken(nameField.text, exerciseId, ProgramStore.revision))
             return qsTr("An exercise with this name already exists.")
         return ""
     }
     readonly property string muscleError: submitted && muscle === "" ? qsTr("Choose a muscle group.") : ""
     readonly property string equipmentError: submitted && equipment === "" ? qsTr("Choose the equipment.") : ""
 
-    signal saved(int exerciseId)
+    signal saved(string exerciseId)
 
     function openNew(name) {
-        exerciseId = 0
+        exerciseId = ""
+        builtIn = false
         nameField.text = name || ""
         muscle = presetMuscle
         equipment = ""
@@ -47,6 +50,7 @@ AuraDialog {
         if (!e)
             return
         exerciseId = id
+        builtIn = e.builtIn
         nameField.text = e.name
         muscle = e.muscle
         equipment = e.equipment
@@ -72,9 +76,19 @@ AuraDialog {
         saved(id)
     }
 
-    title: isNew ? qsTr("New exercise") : qsTr("Edit exercise")
+    title: isNew ? qsTr("New exercise") : builtIn ? qsTr("Built-in exercise") : qsTr("Edit exercise")
     preferredWidth: 580
-    onOpened: nameField.focusInput()
+    onOpened: {
+        if (!builtIn)
+            nameField.focusInput()
+    }
+
+    Notice {
+        tone: "info"
+        visible: dialog.builtIn
+        Layout.fillWidth: true
+        text: qsTr("This exercise is part of the built-in library, so it can't be changed. To adapt it, create your own exercise with a different name.")
+    }
 
     Notice {
         tone: "info"
@@ -89,6 +103,7 @@ AuraDialog {
         Layout.fillWidth: true
         label: qsTr("Name")
         placeholderText: qsTr("e.g. Cable crunch")
+        enabled: !dialog.builtIn
         errorText: dialog.nameError
     }
 
@@ -110,6 +125,7 @@ AuraDialog {
                     required property string modelData
                     text: modelData
                     selected: dialog.muscle === modelData
+                    enabled: !dialog.builtIn
                     onClicked: dialog.muscle = modelData
                 }
             }
@@ -140,6 +156,7 @@ AuraDialog {
                     required property string modelData
                     text: modelData
                     selected: dialog.equipment === modelData
+                    enabled: !dialog.builtIn
                     onClicked: dialog.equipment = modelData
                 }
             }
@@ -157,6 +174,7 @@ AuraDialog {
         Layout.fillWidth: true
         label: qsTr("Instructions")
         placeholderText: qsTr("How to perform it, key cues, common mistakes…")
+        enabled: !dialog.builtIn
     }
 
     AuraTextField {
@@ -165,10 +183,11 @@ AuraDialog {
         label: qsTr("Video link (optional)")
         placeholderText: "https://"
         inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoAutoUppercase
+        enabled: !dialog.builtIn
     }
 
     leftActions: AuraButton {
-        visible: !dialog.isNew
+        visible: !dialog.isNew && !dialog.builtIn
         enabled: dialog.usage === 0
         variant: "ghostDanger"
         text: qsTr("Delete")
@@ -178,10 +197,11 @@ AuraDialog {
     actions: [
         AuraButton {
             variant: "secondary"
-            text: qsTr("Cancel")
+            text: dialog.builtIn ? qsTr("Close") : qsTr("Cancel")
             onClicked: dialog.close()
         },
         AuraButton {
+            visible: !dialog.builtIn
             text: dialog.isNew ? qsTr("Add exercise") : qsTr("Save changes")
             onClicked: dialog.save()
         }

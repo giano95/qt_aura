@@ -8,15 +8,17 @@ sessions in the coach's free time.
 One app, two roles: after login the app opens the **coach app** or the
 **client app** depending on the account.
 
-> **Status: Phase 0 (interactive prototype).** Every screen works, but data lives
-> in memory (QML singletons with sample data) and resets when the app closes.
-> There is no backend yet. See [Roadmap](#roadmap).
+> **Status: moving to the backend (Phase 2).** Login and signup use real
+> Supabase accounts (an internet connection is needed). The rest of the data
+> still lives in memory (QML singletons with sample data) and resets when the
+> app closes, until each store moves to the backend. See [Roadmap](#roadmap).
 
 ---
 
 ## Run it
 
-Requirements: **Qt 6.10+** (developed on **Qt 6.12.0**, macOS), CMake 3.16+, Ninja.
+Requirements: **Qt 6.10+** (developed on **Qt 6.12.0**), CMake 3.16+, Ninja.
+Runs on **macOS** and **Windows** (MinGW kit).
 
 **Qt Creator:** open `CMakeLists.txt`, pick the Qt 6.12 kit, press Run.
 
@@ -32,6 +34,21 @@ open build/dev/appqt_aura.app
 cmake --build build/dev --target all_qmllint
 ```
 
+**Command line (Windows, Git Bash, Qt installed in `C:\Qt`):**
+
+```bash
+export PATH=/c/Qt/Tools/CMake_64/bin:/c/Qt/Tools/Ninja:/c/Qt/Tools/mingw1310_64/bin:/c/Qt/6.12.0/mingw_64/bin:$PATH
+cmake -S . -B build/dev -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.12.0/mingw_64
+cmake --build build/dev
+./build/dev/appqt_aura.exe
+
+# QML linter (should print no warnings)
+cmake --build build/dev --target all_qmllint
+```
+
+Working on both machines: commit and push on one, `git pull` on the other.
+Qt Creator's files (`build/`, `.qtcreator/`) are per machine and not in git.
+
 The window opens at 1920×1080, or smaller to fit the screen.
 
 ### Demo accounts
@@ -41,8 +58,11 @@ The window opens at 1920×1080, or smaller to fit the screen.
 | Coach | `coach@aura.app` | `password` | Giulia Rossi |
 | Client | `client@aura.app` | `password` | Luca Bianchi (one of Giulia's clients) |
 
-New accounts can be created with **Sign up**, but they last only until the app
-closes. Useful ways to try things:
+Every account in the demo data uses the password `password` (other coaches and
+clients: `<first>.<last>@example.com`). Accounts created with **Sign up** are
+real and stay in the database, but until the other stores move to the backend
+the screens behind login still show the in-memory sample data. Useful ways to
+try things:
 
 - **Coach requests:** sign up a new client, request Giulia from **My coach**,
   then log in as the coach → **Clients** → **Accept clients**.
@@ -88,12 +108,16 @@ plus light and dark themes.
 
 ```
 CMakeLists.txt          Qt 6 CMake project; every QML file must be listed in QML_FILES
-main.cpp                Loads the QML module "qt_aura"
+main.cpp                Creates the Supabase client, loads the QML module "qt_aura"
 Main.qml                Window + router: auth flow / coach app / client app
+src/                    C++ (Phase 2)
+  supabase/               SupabaseClient: auth, token refresh, tables, RPC calls
+  models/                 value types QML reads (AuraUser, …)
+  stores/                 C++ stores, QML singletons: Session (login / signup / logout)
+supabase/               Database: migrations/ (schema, rules, RLS) and seed.sql (demo data)
 qml/
   theme/Theme.qml       Design tokens (colors, radii, font sizes), light/dark
-  services/             In-memory data (QML singletons). Phase 2 replaces them with C++
-    Session.qml           login / signup / logout, current user
+  services/             In-memory data (QML singletons), moving to C++ one by one
     ClientStore.qml       the coach's clients and program assignments
     ProgramStore.qml      programs (days, exercises, per-week values) and exercise library
     CalendarStore.qml     working hours, blocked slots, sessions and bookings
@@ -105,7 +129,6 @@ qml/
     coach/                CoachHome + dashboard, clients/, calendar/, programs/
     client/               ClientHome + dashboard, coach/, calendar/, program/
 importedcontent/        Qt Creator's Figma import folder (unused)
-.backup_phase0/         The original Qt Creator template files
 ```
 
 ### Architecture in one paragraph
@@ -124,8 +147,8 @@ stay as they are. All styling comes from `Theme`, and all controls use
 | Phase | What | Status |
 |---|---|---|
 | 0 | Scope and design every screen in QML, with sample data | **Mostly done.** Messages and Progress are still to design |
-| 1 | Backend: Supabase (Postgres) in an EU region, row-level security, auth, migrations in git | Not started |
-| 2 | Qt ↔ backend: C++ `ApiClient` (HTTPS / JSON / tokens), QtKeychain, replace stores with C++ | Not started |
+| 1 | Backend: Supabase (Postgres) in an EU region, row-level security, auth, migrations in git | **Done.** Schema, rules and demo data in `supabase/`; the app doesn't use it yet |
+| 2 | Qt ↔ backend: C++ `SupabaseClient` (HTTPS / JSON / tokens), replace stores with C++; QtKeychain later | Not started |
 | 3 | Remaining core features on real data (messages, progress, session notes) | Not started |
 | 4 | Offline: SQLite cache, sync queue | Not started |
 | 5 | Desktop release: packaging, code signing, CI installers | Not started |

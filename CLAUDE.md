@@ -7,37 +7,65 @@ code safely.
 ## The project in brief
 
 - **Aura**: a Qt 6 / QML coaching app with two roles, **coach** and **client**, in one
-  app. Desktop first (macOS); iOS and Android later with the same QML.
-- **Phase 0** (interactive prototype) is essentially done. All data is in-memory
-  QML singletons with sample data in `qml/services/`. **No backend yet.**
-- **Next planned step: Phase 1**, a Supabase (Postgres) backend in an EU region
-  with row-level security per coach. Then **Phase 2**: C++ `ApiClient` +
-  QtKeychain, with each store replaced by a C++ class exposing the same API.
-- Qt **6.12.0** on the developer's Mac (`~/Qt/6.12.0/macos`). CMake and Ninja are
-  bundled in `~/Qt/Tools`. `qt_standard_project_setup(REQUIRES 6.10)`.
-- **Not a git repository yet.** `.backup_phase0/` holds the original template files.
+  app. Desktop first, on **macOS and Windows**; iOS and Android later with the same QML.
+- **Phase 0** (interactive prototype) is essentially done. The app still runs on
+  in-memory QML singletons with sample data in `qml/services/`.
+- **Phase 1** (Supabase backend) is **done**: schema, row-level security, rules and
+  demo data are live (see "Backend"), but the app doesn't use them yet.
+- **Next step: Phase 2**, a C++ `SupabaseClient`, with each store replaced by a
+  C++ class exposing the same API.
+- Qt **6.12.0** on both of the developer's machines (see below).
+  `qt_standard_project_setup(REQUIRES 6.10)`.
+- **The project must build and run on both macOS and Windows.** Don't add
+  platform-specific code, paths or fonts without a fallback for the other one.
 
 ## Where the code lives and how to work on it
 
-- The project is on the user's **Mac**:
-  `marcogianelli@192.168.1.10:/Users/marcogianelli/projects/qt_aura`, reachable
-  with SSH keys (`ssh -o BatchMode=yes …`).
-- **The user also edits files on the Mac themselves.** Before changing anything:
-  1. pull or diff the Mac copy against any local copy, and adopt the Mac version;
-  2. before copying a file back, check it hasn't changed on the Mac since you read it;
+- **Git repository, `main` branch, remote `origin` = `github.com/giano95/qt_aura`.**
+  GitHub is the source of truth. The user works on two machines, each with its own
+  clone, and moves work between them by committing and pushing:
+
+| Machine | Clone | Qt | Tools |
+|---|---|---|---|
+| Windows PC | `C:\projects\qt_aura` | `C:\Qt\6.12.0\mingw_64` (MinGW 13.1) | `C:\Qt\Tools\{CMake_64,Ninja,mingw1310_64}` |
+| Mac | `~/projects/qt_aura` | `~/Qt/6.12.0/macos` | `~/Qt/Tools/{CMake,Ninja}` |
+
+- **The user also edits files themselves, on either machine.** Before changing anything:
+  1. `git status` and `git fetch`; if `origin/main` is ahead, tell the user and
+     pull before editing (their latest work may be on the other machine);
+  2. never overwrite uncommitted changes you didn't make;
   3. never restore UI or code the user removed (see "User decisions").
-- Inside `while read` loops use `ssh -n`, otherwise ssh swallows the loop's input.
-- Build and lint (both must be clean before you're done):
+- Commit or push only when the user asks.
+- `.gitignore` excludes `build/` and `.qtcreator/` (Qt Creator's per-machine files).
+  `CMakeLists.txt.user` and kit names differ per machine; never commit them.
+- Build and lint (both must be clean before you're done). Build in a temp folder
+  (the scratchpad, or `/tmp` on the Mac), not in the project's `build/` folder
+  (that belongs to Qt Creator).
+
+  **Windows** (Bash tool, Git Bash):
+
+```bash
+export PATH=/c/Qt/Tools/CMake_64/bin:/c/Qt/Tools/Ninja:/c/Qt/Tools/mingw1310_64/bin:$PATH
+cmake -S C:/projects/qt_aura -B <tmp>/qt_aura_check -G Ninja \
+      -DCMAKE_PREFIX_PATH=C:/Qt/6.12.0/mingw_64
+cmake --build <tmp>/qt_aura_check
+cmake --build <tmp>/qt_aura_check --target all_qmllint   # expect no "Warning:" lines
+```
+
+  To run the `.exe` outside Qt Creator, put `C:/Qt/6.12.0/mingw_64/bin` and
+  `C:/Qt/Tools/mingw1310_64/bin` on `PATH` (the Qt and MinGW DLLs live there).
+
+  **macOS:**
 
 ```bash
 export PATH=$HOME/Qt/Tools/CMake/CMake.app/Contents/bin:$HOME/Qt/Tools/Ninja:$PATH
-cmake -S /Users/marcogianelli/projects/qt_aura -B /tmp/qt_aura_check -G Ninja \
+cmake -S ~/projects/qt_aura -B /tmp/qt_aura_check -G Ninja \
       -DCMAKE_PREFIX_PATH=$HOME/Qt/6.12.0/macos
 cmake --build /tmp/qt_aura_check
 cmake --build /tmp/qt_aura_check --target all_qmllint   # expect no "Warning:" lines
 ```
 
-  Build in `/tmp/...`, not in the project's `build/` folder (that belongs to Qt Creator).
+  If you can only build on one machine, say so: the other one hasn't been checked.
 - **Every new QML file must be added to `QML_FILES` in `CMakeLists.txt`.**
   Singletons also go in `AURA_QML_SINGLETONS`, which sets `QT_QML_SINGLETON_TYPE`,
   and need `pragma Singleton`. Quick check that nothing is missing:
@@ -47,13 +75,15 @@ cmake --build /tmp/qt_aura_check --target all_qmllint   # expect no "Warning:" l
 
 There is no test suite. Behaviour has been checked with a throwaway **screenshot
 driver**:
-1. copy the project to `/tmp/aura_shots/src` (rsync, excluding `build/` and `.qtcreator/`);
+1. copy the project to a temp folder (e.g. `/tmp/aura_shots/src` on the Mac, the
+   scratchpad on Windows), excluding `build/` and `.qtcreator/`;
 2. replace `main.cpp` with a C++ driver that loads the `qt_aura` module, runs timed
    steps (log in through `Session`, set `router.item.currentIndex`, call store or
    page functions, send real `QMouseEvent`s to `QQuickWindow`), and saves
    `grabWindow()` PNGs;
-3. run it with
-   `QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software perl -e "alarm 90; exec @ARGV" ./build/appqt_aura.app/Contents/MacOS/appqt_aura`.
+3. run it with `QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software` and a timeout:
+   - macOS: `perl -e "alarm 90; exec @ARGV" ./build/appqt_aura.app/Contents/MacOS/appqt_aura`
+   - Windows (Git Bash, Qt and MinGW `bin` on `PATH`): `timeout 90 ./build/appqt_aura.exe`
 
 Pitfalls with the offscreen platform:
 - Call `W->update()` on a ~16 ms timer, or animations and transitions freeze and
@@ -62,8 +92,72 @@ Pitfalls with the offscreen platform:
 - Popups closed in the same step can still show in the next grab.
 - When searching the object tree, keep a visited set: `children()` and
   `childItems()` overlap, and without it the search blows up.
-- Use `perl -e "alarm N"` as a timeout; macOS has no `timeout` command.
+- macOS has no `timeout` command; use `perl -e "alarm N"` there. Git Bash on
+  Windows has `timeout`.
+- Windows: the app is a GUI-subsystem exe, so set `QT_FORCE_STDERR_LOGGING=1`
+  to see `qInfo`/warnings, and `QT_QPA_FONTDIR=C:/Windows/Fonts` or offscreen
+  screenshots show boxes instead of text. Keep the driver's build path short-ish
+  (CMake warns above 250-char object paths).
+- The driver talks to the real Supabase project now: delete any accounts it
+  creates (e.g. sign up `signup-test-…@example.com`, then
+  `delete from auth.users where email like 'signup-test-%'`).
+- The driver's `main.cpp` must create the `SupabaseClient` before the engine,
+  like the real `main.cpp`.
 - Never put this driver into the project.
+
+## Backend (Phase 1 done, Phase 2 next)
+
+Supabase project `dpijfmdalkhbgfxkrwws` (EU), reachable through the `supabase`
+MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
+(2026-11-22):
+
+- **Database** (`supabase/migrations/*.sql`, applied in order; `supabase/seed.sql`
+  for demo data). Keep the files in git as the source of truth: change the
+  schema with a new migration file, then apply it (MCP `apply_migration`, same
+  name as the file without the timestamp), never only through the dashboard.
+  Migrations 1–3 and the seed are applied (2026-11-22).
+  - Test rules by impersonating a user inside a rolled-back transaction:
+    `set_config('request.jwt.claims', '{"sub": "<profile id>", "role": "authenticated"}', true)`,
+    then `set local role authenticated`, call functions, and end with
+    `raise exception` to print results and roll back.
+  - App-facing functions are `security definer` and executable by
+    `authenticated` on purpose (the advisor warns about each one). Internal
+    helpers (`require_role`, `coach_tz`, `coach_today`, `handle_new_user`) are
+    not executable by API users; keep it that way for new helpers.
+  - Every coach is a real account; there's no "demo coach" special case any more.
+  - `coachings` replaces both `ClientStore.clients` and `CoachStore.relations`.
+  - Exercise library: **built-in rows (`coach_id` null, read-only) + each coach's own**.
+  - Sessions use `timestamptz`; working hours are minutes in the coach's time zone
+    (`coach_profiles.timezone`, default Europe/Rome).
+  - Booking, coaching and assignment rules are enforced in SQL functions
+    (security definer, raising error codes like `slot_unavailable`); RLS only
+    governs reads plus a few direct writes (exercises, blocked slots, program delete).
+    Clients get a coach's busy times without details from `coach_busy()`.
+  - Seed: the prototype's people, programs and calendar as real accounts, all with
+    password `password`. Sample coaches can't answer (no auto-accept).
+- **App** (Phase 2, in progress). Done: `SupabaseClient` + `Session` (real
+  login/signup). The other stores are still the QML mocks; they find the user
+  by `Session.user.email`, which still matches the seeded accounts.
+  - C++ lives in `src/` (`supabase/` client, `models/` value types, `stores/`
+    QML singletons). **Every new C++ file goes in `SOURCES` of
+    `qt_add_qml_module`**, and its folder in `target_include_directories`.
+    A C++ store replacing a QML one must also remove the `.qml` file from
+    `AURA_QML_SINGLETONS` (same name = conflict).
+  - Supabase URL and publishable key are CMake cache variables
+    (`AURA_SUPABASE_URL` / `AURA_SUPABASE_KEY`) passed as compile definitions.
+  - Stores call `SupabaseClient::instance()->select / insert / update / remove / rpc`
+    with `this` as context; `Reply::errorCode` is the SQL function's error code
+    (e.g. `slot_unavailable`), an Auth `error_code`, or `network`.
+  - **Full C++ stores** (user's choice, wants C++ and future unit tests): each store
+    becomes a C++ QML singleton with the same functions, so screens change little.
+  - Data reaches QML as **typed value types** (`Q_GADGET` structs), so screens keep
+    reading `client.name` / `modelData.name`. The program and working-hours
+    editors need rework, because they edit their draft in place.
+  - One C++ `SupabaseClient` for auth (email/password, token refresh), PostgREST
+    reads and RPC calls; Qt Network only, same code on macOS and Windows.
+  - Changes apply locally at once with client-generated UUIDs, then go to the
+    server; on error, revert and show the error.
+  - **Log in at every launch for now**; QtKeychain ("stay logged in") comes later.
 
 ## Architecture
 
@@ -90,7 +184,7 @@ Pitfalls with the offscreen platform:
 
 | Store | Responsibility |
 |---|---|
-| `Session` | Mock auth: `login`, `signup`, `logout`, `user {id,name,email,role}`, `busy`, `lastError` |
+| `Session` | **C++** (`src/stores/session.*`), Supabase Auth: `login`, `signup`, `logout`, `user {id,name,email,role}` (`AuraUser` value type, empty id when logged out), `busy`, `lastError` |
 | `ClientStore` | The demo coach's clients + program assignments, program status (`none`/`scheduled`/`active`/`endingSoon`/`expired`), invite / activate / remove, assign / extend / end |
 | `ProgramStore` | Programs (days → exercise entries) and exercise library. Per-week changes. Display helpers |
 | `CalendarStore` | Demo coach's working hours + blocked slots, all sessions/bookings, slot states, booking rules |
@@ -220,7 +314,7 @@ Pitfalls with the offscreen platform:
   removed or turned into something meaningful.
 - `SegmentedTabs` is no longer used anywhere.
 - Coaches can't edit their public profile (bio, price, …): it's sample data in `CoachStore`.
-- No persistence: everything resets on restart. No git repo.
+- No persistence: everything resets on restart.
 
 **Open product questions** (ask the user rather than guess)
 - Should coaches be able to open one-off extra hours, or take multi-day time off?

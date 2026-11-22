@@ -2,11 +2,18 @@ cmake_minimum_required(VERSION 3.16)
 
 project(qt_aura VERSION 0.1 LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Network)
 
 qt_standard_project_setup(REQUIRES 6.10)
+
+# Supabase project the app talks to. The publishable key is meant to ship in
+# client apps: row-level security in the database decides what each user can
+# read or change. Override with -DAURA_SUPABASE_URL=... -DAURA_SUPABASE_KEY=...
+set(AURA_SUPABASE_URL "https://dpijfmdalkhbgfxkrwws.supabase.co" CACHE STRING "Supabase project URL")
+set(AURA_SUPABASE_KEY "sb_publishable_KLY2dgRe6UC6P6w9tPiqCg_R2XhGvrA" CACHE STRING "Supabase publishable key")
 
 # Content of downloaded design from Figma to Qt or similar
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/importedcontent/CMakeLists.txt")
@@ -20,7 +27,6 @@ qt_add_executable(appqt_aura
 # QML singletons: design tokens, session state, prototype data
 set(AURA_QML_SINGLETONS
     qml/theme/Theme.qml
-    qml/services/Session.qml
     qml/services/MockData.qml
     qml/services/ProgramStore.qml
     qml/services/ClientStore.qml
@@ -33,6 +39,11 @@ set_source_files_properties(${AURA_QML_SINGLETONS}
 
 qt_add_qml_module(appqt_aura
     URI qt_aura
+    # C++ stores (QML singletons), value types and the backend client
+    SOURCES
+        src/supabase/supabaseclient.h src/supabase/supabaseclient.cpp
+        src/models/aurauser.h
+        src/stores/session.h src/stores/session.cpp
     QML_FILES
         Main.qml
         ${AURA_QML_SINGLETONS}
@@ -131,7 +142,19 @@ set_target_properties(appqt_aura PROPERTIES
 )
 
 target_link_libraries(appqt_aura
-    PRIVATE Qt6::Quick Qt6::QuickControls2
+    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network
+)
+
+# Headers are included by file name (also by the generated QML type registration)
+target_include_directories(appqt_aura PRIVATE
+    src/supabase
+    src/models
+    src/stores
+)
+
+target_compile_definitions(appqt_aura PRIVATE
+    AURA_SUPABASE_URL="${AURA_SUPABASE_URL}"
+    AURA_SUPABASE_KEY="${AURA_SUPABASE_KEY}"
 )
 
 include(GNUInstallDirs)

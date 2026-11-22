@@ -11,12 +11,12 @@ ColumnLayout {
 
     property string mode: "all"            // "all" | "online" | "inPerson"
 
-    readonly property var results: CoachStore.search(search.text, mode)
+    readonly property var results: CoachStore.search(search.text, mode, CoachStore.revision)
     readonly property int columns: Math.max(1, Math.min(3, Math.floor((width + 16) / 336)))
 
     // The profile dialog's "Request" button
-    signal requestRequested(int coachId)
-    signal profileRequested(int coachId)
+    signal requestRequested(string coachId)
+    signal profileRequested(string coachId)
 
     spacing: 16
 

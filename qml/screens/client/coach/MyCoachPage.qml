@@ -25,9 +25,9 @@ Item {
     readonly property bool wide: scroll.availableWidth >= 820
 
     // The client's program with the demo coach (others have no data yet)
-    readonly property var me: Session.loggedIn ? ClientStore.clientByEmail(Session.user.email) : null
+    readonly property var me: Session.loggedIn ? ClientStore.clientByEmail(Session.user.email, ClientStore.revision) : null
     readonly property var programStatus: me ? ClientStore.programStatus(me) : ({ kind: "none", assignment: null })
-    readonly property var booked: Session.loggedIn ? CalendarStore.nextSessionFor(Session.user.email, Session.user.name) : null
+    readonly property var booked: Session.loggedIn ? CalendarStore.nextSessionFor(Session.user.email, Session.user.name, CalendarStore.revision) : null
     readonly property var nextSession: booked
         ? { date: new Date(CalendarStore.startMs(booked)), duration: qsTr("%1 min").arg(booked.end - booked.start),
             topic: booked.type, mode: booked.mode, pending: booked.status === "pending" }
@@ -242,9 +242,9 @@ Item {
                     Notice {
                         tone: "info"
                         Layout.fillWidth: true
-                        text: page.coach && page.coach.id === CoachStore.demoCoachId
-                              ? qsTr("Prototype: to answer it, log out and log in as %1 (password: password), then open Clients → Accept clients.").arg(page.coach.email)
-                              : qsTr("Prototype: %1 accepts automatically in a few seconds.").arg(page.firstName)
+                        text: page.coach
+                              ? qsTr("Demo: to answer it, log out and log in as %1 (password: password), then open Clients → Accept clients. This page updates as soon as they answer.").arg(page.coach.email)
+                              : ""
                     }
 
                     RowLayout {

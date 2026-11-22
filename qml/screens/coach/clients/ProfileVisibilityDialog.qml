@@ -11,12 +11,12 @@ AuraDialog {
     property string choice: "public"
 
     readonly property int pendingCount: CoachStore.pendingRequests.length
-    readonly property bool changed: choice !== (CoachStore.demoIsPublic ? "public" : "private")
+    readonly property bool changed: choice !== (CoachStore.isPublic ? "public" : "private")
 
     signal saved(string visibility)
 
     function openEditor() {
-        choice = CoachStore.demoIsPublic ? "public" : "private"
+        choice = CoachStore.isPublic ? "public" : "private"
         open()
     }
 
@@ -71,7 +71,7 @@ AuraDialog {
             text: qsTr("Save")
             enabled: dialog.changed
             onClicked: {
-                CoachStore.setDemoVisibility(dialog.choice)
+                CoachStore.setVisibility(dialog.choice)
                 dialog.close()
                 dialog.saved(dialog.choice)
             }

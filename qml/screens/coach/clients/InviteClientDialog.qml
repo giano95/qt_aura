@@ -20,7 +20,7 @@ AuraDialog {
         return ""
     }
 
-    signal invited(int clientId)
+    signal invited(string clientId)
 
     function openNew() {
         nameField.text = ""

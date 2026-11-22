@@ -8,12 +8,12 @@ import QtQuick.Controls.Basic
 AuraDialog {
     id: dialog
 
-    property int clientId: 0
+    property string clientId: ""
     property string programId: ""
     property double startMs: ClientStore.today()
     property bool submitted: false
 
-    readonly property var client: ClientStore.clientById(clientId)
+    readonly property var client: ClientStore.clientById(clientId, ClientStore.revision)
     readonly property var program: ProgramStore.programs.find(p => p.id === programId) || null
     readonly property int weeks: program ? ProgramStore.weekCount(program) : 0
     readonly property var current: client ? ClientStore.programStatus(client) : ({ kind: "none", assignment: null })

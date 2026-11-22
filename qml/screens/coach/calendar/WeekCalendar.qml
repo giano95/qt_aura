@@ -20,14 +20,14 @@ ColumnLayout {
     property var hover: null                                      // { day, slot } under the pointer
 
     // A session was clicked (request, confirmed or past): the page opens its details
-    signal sessionClicked(int sessionId)
+    signal sessionClicked(string sessionId)
 
     readonly property double todayMs: CalendarStore.startOfDay(CalendarStore.now)
     readonly property var days: [0, 1, 2, 3, 4, 5, 6].map(i => CalendarStore.addDays(weekStart, i))
     readonly property var shownDays: wide ? days : [days[selectedDay]]
-    readonly property var range: CalendarStore.visibleRange(weekStart)
+    readonly property var range: CalendarStore.visibleRange(weekStart, CalendarStore.revision)
     readonly property int slotCount: (range.to - range.from) / CalendarStore.slotMinutes
-    readonly property var stats: CalendarStore.weekStats(weekStart)
+    readonly property var stats: CalendarStore.weekStats(weekStart, CalendarStore.revision)
     readonly property int timeColumnWidth: 52
     readonly property int rowHeight: wide ? 24 : 34
     readonly property bool isCurrentWeek: weekStart === CalendarStore.mondayOf(CalendarStore.now)
@@ -43,7 +43,7 @@ ColumnLayout {
                 group.forEach(g => { g.lanes = lanes; list.push(g) })
                 group = []
             }
-            CalendarStore.sessionsOn(day).forEach(s => {
+            CalendarStore.sessionsOn(day, CalendarStore.revision).forEach(s => {
                 if (group.length > 0 && s.start >= groupEnd)
                     flush()
                 const busy = group.filter(g => g.session.end > s.start).map(g => g.lane)
@@ -85,9 +85,9 @@ ColumnLayout {
     function changeableSlots(dayMs, toBlocked) {
         const list = []
         for (let m = 0; m < 24 * 60; m += CalendarStore.slotMinutes) {
-            if (!CalendarStore.isToggleable(dayMs, m))
+            if (!CalendarStore.isToggleable(dayMs, m, CalendarStore.revision))
                 continue
-            if (CalendarStore.isBlocked(dayMs, m) !== toBlocked)
+            if (CalendarStore.isBlocked(dayMs, m, CalendarStore.revision) !== toBlocked)
                 list.push(m)
         }
         return list
@@ -104,16 +104,16 @@ ColumnLayout {
         const minute = slotMinute(hover.slot)
         const when = Qt.formatDate(new Date(day), "ddd d MMM") + " · "
                    + CalendarStore.formatMinutes(minute) + "–" + CalendarStore.formatMinutes(minute + CalendarStore.slotMinutes)
-        const here = CalendarStore.sessionsOn(day).filter(s => minute >= s.start && minute < s.end)
+        const here = CalendarStore.sessionsOn(day, CalendarStore.revision).filter(s => minute >= s.start && minute < s.end)
         if (here.length > 1)
             return when + " · " + qsTr("Double booked: %1").arg(here.map(s => s.client).join(", "))
         if (here.length === 1 && here[0].status === "pending")
             return when + " · " + qsTr("%1 asked for this session: click to see the request").arg(here[0].client)
         if (here.length === 1)
             return when + " · " + qsTr("Session with %1: click for details").arg(here[0].client)
-        if (CalendarStore.isPast(day, minute))
+        if (CalendarStore.isPast(day, minute, CalendarStore.revision))
             return when + " · " + qsTr("Already passed")
-        switch (CalendarStore.slotState(day, minute)) {
+        switch (CalendarStore.slotState(day, minute, CalendarStore.revision)) {
         case "available": return when + " · " + qsTr("Free: click to block")
         case "blocked": return when + " · " + qsTr("Blocked: click to free")
         default: return when + " · " + qsTr("Outside your working hours")
@@ -327,12 +327,12 @@ ColumnLayout {
                         readonly property int slot: index % root.slotCount
                         readonly property double dayMs: root.shownDays[dayIndex] || 0
                         readonly property int minute: root.slotMinute(slot)
-                        readonly property string slotState: CalendarStore.slotState(dayMs, minute)
-                        readonly property bool past: CalendarStore.isPast(dayMs, minute)
+                        readonly property string slotState: CalendarStore.slotState(dayMs, minute, CalendarStore.revision)
+                        readonly property bool past: CalendarStore.isPast(dayMs, minute, CalendarStore.revision)
                         readonly property bool hovered: root.hover !== null && root.hover.day === dayIndex && root.hover.slot === slot
                         readonly property bool changeable: !past && (slotState === "available" || slotState === "blocked")
                         readonly property bool firstBlocked: slotState === "blocked"
-                                                            && (slot === 0 || CalendarStore.slotState(dayMs, minute - CalendarStore.slotMinutes) !== "blocked")
+                                                            && (slot === 0 || CalendarStore.slotState(dayMs, minute - CalendarStore.slotMinutes, CalendarStore.revision) !== "blocked")
 
                         x: root.timeColumnWidth + dayIndex * grid.columnWidth + 1
                         y: slot * root.rowHeight
@@ -394,7 +394,7 @@ ColumnLayout {
                         id: sessionBlock
                         required property var modelData
                         readonly property var session: modelData.session
-                        readonly property bool past: CalendarStore.isPast(modelData.dayMs, session.end - CalendarStore.slotMinutes)
+                        readonly property bool past: CalendarStore.isPast(modelData.dayMs, session.end - CalendarStore.slotMinutes, CalendarStore.revision)
                         readonly property bool overlaps: modelData.lanes > 1
                         readonly property bool pending: session.status === "pending"
                         readonly property real laneWidth: (grid.columnWidth - 4) / modelData.lanes
@@ -510,9 +510,9 @@ ColumnLayout {
                             return
                         const day = root.shownDays[c.day]
                         const minute = root.slotMinute(c.slot)
-                        if (!CalendarStore.isToggleable(day, minute))
+                        if (!CalendarStore.isToggleable(day, minute, CalendarStore.revision))
                             return
-                        const isBlocked = CalendarStore.isBlocked(day, minute)
+                        const isBlocked = CalendarStore.isBlocked(day, minute, CalendarStore.revision)
                         if (mode === 1 && !isBlocked)
                             CalendarStore.setBlocked(day, [minute], true)
                         else if (mode === -1 && isBlocked)
@@ -526,11 +526,11 @@ ColumnLayout {
                     preventStealing: root.wide
                     // The session under the pointer, or null
                     function sessionAtCell(c) {
-                        return c ? CalendarStore.sessionAt(root.shownDays[c.day], root.slotMinute(c.slot)) : null
+                        return c ? CalendarStore.sessionAt(root.shownDays[c.day], root.slotMinute(c.slot), CalendarStore.revision) : null
                     }
 
                     cursorShape: root.hover !== null
-                                 && (CalendarStore.isToggleable(root.shownDays[root.hover.day], root.slotMinute(root.hover.slot))
+                                 && (CalendarStore.isToggleable(root.shownDays[root.hover.day], root.slotMinute(root.hover.slot), CalendarStore.revision)
                                      || sessionAtCell(root.hover) !== null)
                                  ? Qt.PointingHandCursor : Qt.ArrowCursor
 
@@ -542,11 +542,11 @@ ColumnLayout {
                             root.sessionClicked(session.id)
                             return
                         }
-                        if (!c || !CalendarStore.isToggleable(root.shownDays[c.day], root.slotMinute(c.slot))) {
+                        if (!c || !CalendarStore.isToggleable(root.shownDays[c.day], root.slotMinute(c.slot), CalendarStore.revision)) {
                             mouse.accepted = false
                             return
                         }
-                        mode = CalendarStore.isBlocked(root.shownDays[c.day], root.slotMinute(c.slot)) ? -1 : 1
+                        mode = CalendarStore.isBlocked(root.shownDays[c.day], root.slotMinute(c.slot), CalendarStore.revision) ? -1 : 1
                         lastCell = null
                         applyTo(c)
                     }

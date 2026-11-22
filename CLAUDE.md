@@ -12,8 +12,8 @@ code safely.
 - **Phase 1** (Supabase backend) is **done**: schema, row-level security, rules and
   demo data are live (see "Backend").
 - **Phase 2 in progress**: a C++ `SupabaseClient`, with each store replaced by a
-  C++ class exposing the same API. `Session` and `ProgramStore` are done; the
-  other stores are still in-memory QML singletons in `qml/services/`.
+  C++ class exposing the same API. All five stores are C++ now (`src/stores/`);
+  only `MockData` (sample dashboard content) is left in `qml/services/`.
 - Qt **6.12.0** on both of the developer's machines (see below).
   `qt_standard_project_setup(REQUIRES 6.10)`.
 - **The project must build and run on both macOS and Windows.** Don't add
@@ -101,8 +101,15 @@ Pitfalls with the offscreen platform:
 - The driver talks to the real Supabase project now: delete any accounts it
   creates (e.g. sign up `signup-test-…@example.com`, then
   `delete from auth.users where email like 'signup-test-%'`).
-- The driver's `main.cpp` must create the `SupabaseClient` before the engine,
-  like the real `main.cpp`.
+- The driver's `main.cpp` must create the `SupabaseClient` (and the
+  `RealtimeClient`, for live updates) before the engine, like the real `main.cpp`.
+- Run drivers that log in by themselves with `AURA_NO_SAVED_LOGIN=1`, or a
+  saved login from an earlier run is restored at startup and races the
+  driver's own login. (The driver doesn't set an application name, so its
+  saved login is separate from the real app's anyway.)
+- Live updates can be tested with two drivers at once (e.g. `PHASE=coach` and
+  `PHASE=client` started with `&` in one Bash call, then `wait`): one changes
+  data, the other logs what it sees every few seconds.
 - To run QML from the driver, use `QQmlExpression(qmlContext(window), window, code)`:
   that context sees the module's singletons and `Main.qml` ids (`router`); the
   engine's root context doesn't. JS globals don't persist between expressions.
@@ -121,7 +128,7 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
   for demo data). Keep the files in git as the source of truth: change the
   schema with a new migration file, then apply it (MCP `apply_migration`, same
   name as the file without the timestamp), never only through the dashboard.
-  Migrations 1–3 and the seed are applied (2026-11-22).
+  Migrations 1–5 and the seed are applied (2026-11-22).
   - Test rules by impersonating a user inside a rolled-back transaction:
     `set_config('request.jwt.claims', '{"sub": "<profile id>", "role": "authenticated"}', true)`,
     then `set local role authenticated`, call functions, and end with
@@ -142,16 +149,21 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
   - Seed: the prototype's people, programs and calendar as real accounts, all with
     password `password`. Sample coaches can't answer (no auto-accept).
 - **App** (Phase 2, in progress). Done: `SupabaseClient`, `Session` (real
-  login/signup), `ProgramStore` (programs + exercises). `ClientStore`,
-  `CoachStore`, `CalendarStore` are still the QML mocks; they find the user by
-  `Session.user.email`, which still matches the seeded accounts.
-  - `ClientStore.qml` has a **temporary `_programBridge`** that points its sample
-    assignments (numeric program ids) at the real programs by name. Delete it
-    when ClientStore moves to C++.
-  - Program and exercise ids are UUID strings; `""` means "new" (was `0`).
+  login/signup), `ProgramStore` (programs + exercises), `ClientStore` and
+  `CoachStore` (coachings, assignments, directory), `CalendarStore` (hours,
+  blocked slots, sessions), live updates, stay logged in. Still to do in
+  Phase 2: unit tests.
+  - Program, exercise, client (= coaching), coach and session ids are UUID
+    strings; `""` means "new" / none (was `0`).
+  - `CalendarStore`: a coach loads their own hours, blocked slots and all their
+    sessions (no paging by week yet); a client loads their own sessions plus
+    their coach's hours and `coach_busy()` for the bookable weeks. Its
+    `revision` also changes once a minute (with `now`), so slots turn "past".
+    Session times are converted to the device's local day and minutes.
   - C++ lives in `src/` (`supabase/` client, `models/` value types, `stores/`
-    QML singletons). **Every new C++ file goes in `SOURCES` of
-    `qt_add_qml_module`**, and its folder in `target_include_directories`.
+    QML singletons). Headers use `.hpp`, sources `.cpp`. **Every new C++
+    file goes in `SOURCES` of `qt_add_qml_module`**, and its folder in
+    `target_include_directories`.
     A C++ store replacing a QML one must also remove the `.qml` file from
     `AURA_QML_SINGLETONS` (same name = conflict).
   - Supabase URL and publishable key are CMake cache variables
@@ -159,10 +171,38 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
   - Stores call `SupabaseClient::instance()->select / insert / update / remove / rpc`
     with `this` as context; `Reply::errorCode` is the SQL function's error code
     (e.g. `slot_unavailable`), an Auth `error_code`, or `network`.
-  - Store pattern (see `ProgramStore`): load on `SupabaseClient::sessionChanged`
-    when the user id changes (it also fires on token refresh), clear on logout;
-    writes update the local list first, then the server; on error emit
-    `errorOccurred(message)` (shown by the toast in `Main.qml`) and reload.
+  - Store pattern: derive from `StoreBase` (`src/stores/storebase.*`), implement
+    `load()` / `clearData()`, call `start({tables})` at the end of the constructor.
+    It loads when the user id changes (`sessionChanged` also fires on token
+    refresh) and clears on logout. Writes update the local list first, then go
+    through `write()` / `writeRpc()`, **a queue that sends one request at a
+    time** (parallel requests can arrive out of order: an "extend" overtook
+    its "assign" in testing). On error it emits `errorOccurred(message)` (the
+    toast in `Main.qml`) and reloads once the queue is empty; use
+    `requestLoad()`, not `load()`, for reloads, so they wait for the queue.
+  - Stores tell each other about server changes with `notify("coachings")`
+    (`SupabaseClient::notifyChanged`); stores that list that table in `start()`
+    reload. E.g. CoachStore accepting a request reloads ClientStore and ProgramStore.
+  - **Live updates** (Supabase Realtime, "broadcast from the database"):
+    - Triggers (`realtime_on_change()`, migration 4) send `{ "table": … }` to
+      each affected user's private channel `user:<profile id>`, once per user
+      and table per transaction. No row data travels; the app re-reads
+      through the API, so RLS still decides what each user sees. Policy on
+      `realtime.messages`: a user can join and read only their own channel.
+    - `RealtimeClient` (`src/supabase/realtimeclient.*`, `QWebSocket`, created
+      in `main.cpp`) joins that channel while logged in, sends heartbeats and
+      refreshed tokens, reconnects with backoff, and turns each message into
+      `SupabaseClient::notifyChanged(table)`. After a reconnect it sends `"*"`
+      (every store reloads, since messages sent meanwhile are lost).
+    - `StoreBase` waits 300 ms after a change notice, then reloads once.
+    - **A new table the app shows needs a trigger** (a branch in
+      `realtime_on_change()` saying who to notify, via a new migration) and
+      the table name in the `start({...})` list of the stores that show it.
+    - Your own changes come back as notices too (one extra reload), which keeps
+      the same account on two devices in sync.
+    - `realtime.messages` partitions are created by the Realtime server: on a
+      fresh project the first join can be refused (`MissingPartition`); the
+      client retries after 1 s.
   - **C++ store functions don't make QML bindings depend on store data.** A
     binding like `ProgramStore.searchExercises(text, muscle)` only re-runs when
     its arguments change. Each C++ store has a `revision` property; bindings
@@ -184,10 +224,26 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
     reading `client.name` / `modelData.name`. The program and working-hours
     editors need rework, because they edit their draft in place.
   - One C++ `SupabaseClient` for auth (email/password, token refresh), PostgREST
-    reads and RPC calls; Qt Network only, same code on macOS and Windows.
+    reads and RPC calls, plus `RealtimeClient` for live updates; Qt Network and
+    Qt WebSockets only (both machines need the Qt WebSockets add-on), same code
+    on macOS and Windows.
   - Changes apply locally at once with client-generated UUIDs, then go to the
     server; on error, revert and show the error.
-  - **Log in at every launch for now**; QtKeychain ("stay logged in") comes later.
+  - **Stay logged in** (`SessionStorage`, `src/supabase/sessionstorage.*`):
+    - The Supabase refresh token is saved in the system's secure storage
+      through **QtKeychain** (macOS Keychain, Windows Credential Manager entry
+      `supabase-session:<project host>@<app name>`). QtKeychain 0.18.0 is
+      downloaded and built as a static library by CMake (`FetchContent`,
+      pinned by SHA-256), so the first configure on a machine needs internet.
+    - At startup `Session` resumes it (`Session.restoring` → splash in
+      `Main.qml`), then loads the profile like a login. Every new refresh
+      token is saved (Supabase rotates them); logout or a rejected token
+      deletes it. A network error keeps it for the next launch.
+    - Only the first running copy stays logged in (lock file in the app data
+      folder): Supabase revokes the whole login when a rotated token is used
+      twice, which two copies sharing one saved token would do.
+    - `AURA_NO_SAVED_LOGIN=1` turns it off (test drivers that log in by
+      themselves, so a restore doesn't race their login).
 
 ## Architecture
 
@@ -207,23 +263,22 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
   detail), `ProgramsSection` (list → editor). `ProgramsSection.openProgram(id, backText)`
   opens a program from another section (from a client's page); the back button
   then returns there.
-- **Stores (`qml/services/`) own all data and rules. Screens only call them.**
-  Keep it that way: it's the seam where Phase 2 swaps in C++ classes. Mutations
-  **reassign** arrays and objects (`list = list.concat(...)`, `Object.assign({}, …)`)
-  so bindings update.
+- **Stores (C++ singletons in `src/stores/`) own all data and rules. Screens
+  only call them.** Keep it that way. Bindings calling store functions pass the
+  store's `revision` (see "Backend").
 
 | Store | Responsibility |
 |---|---|
-| `Session` | **C++** (`src/stores/session.*`), Supabase Auth: `login`, `signup`, `logout`, `user {id,name,email,role}` (`AuraUser` value type, empty id when logged out), `busy`, `lastError` |
-| `ClientStore` | The demo coach's clients + program assignments, program status (`none`/`scheduled`/`active`/`endingSoon`/`expired`), invite / activate / remove, assign / extend / end |
+| `Session` | **C++** (`src/stores/session.*`), Supabase Auth: `login`, `signup`, `logout`, `user {id,name,email,role}` (`AuraUser` value type, empty id when logged out), `busy`, `lastError`, `restoring` (resuming the saved login at startup) |
+| `ClientStore` | **C++** (`src/stores/clientstore.*`, models in `src/models/coaching.*`): the coach's clients (invited / active / paused coachings) + assignments, or the client's own coaching (`clientByEmail(Session.user.email)`); program status (`none`/`scheduled`/`active`/`endingSoon`/`expired`), invite, assign / extend / end, date helpers |
 | `ProgramStore` | **C++** (`src/stores/programstore.*`, models in `src/models/program.*`): programs (days → exercise entries) and exercise library (built-in = read-only), per-week changes, display helpers. Editor drafts are JS objects |
-| `CalendarStore` | Demo coach's working hours + blocked slots, all sessions/bookings, slot states, booking rules |
-| `CoachStore` | Coach directory (6 sample coaches), public/private, coach–client relations (requests, invitations), `myRelation` / `myCoach` for the logged-in client |
+| `CalendarStore` | **C++** (`src/stores/calendarstore.*`, models in `src/models/calendar.*`): the coach's working hours, blocked slots and sessions; the client's sessions and their coach's free slots; slot states, booking rules, requests / confirm / decline / cancel |
+| `CoachStore` | **C++** (`src/stores/coachstore.*`): coach directory (with working hours), `myRelation` / `myCoach` for a client (requests, invitations, leave), `myProfile` / `isPublic` / `pendingRequests` / `setVisibility` for a coach |
 | `MockData` | Leftover sample content for dashboards (stats, today checklist, goals, coach message) |
 
-- **Coach 1 (Giulia Rossi, `coach@aura.app`) is the "demo coach".** She's the only
-  coach with an account. `ClientStore` and `CalendarStore` describe *her* clients
-  and calendar. The other directory coaches (ids 2–6) are sample profiles only.
+- All data is real and per account. In the seed, Giulia Rossi (`coach@aura.app`)
+  is the coach with clients, programs and a calendar; the other coaches have
+  hours but no clients.
 
 ## Business rules (as implemented)
 
@@ -248,8 +303,8 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
 - **Private** coach: not listed; invites by email (a `ClientStore` client with
   status `invited`); the client accepts or declines in **My coach**.
 - Switching to private declines all waiting requests.
-- Coaching requests to the sample coaches (ids 2–6) are accepted automatically
-  after 4 s (`CoachStore.autoAcceptMs`), since they have no account.
+- Nobody accepts automatically: the coach answers from their own account.
+  A coach that isn't `accepting` can't be requested (`coach_not_available`).
 
 **Calendar and bookings**
 - Everything works in 30-minute slots. The grid always shows 07:00–21:00
@@ -260,8 +315,9 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
   4 weeks ahead (`bookingWeeks`). They do this by clicking or dragging in
   `ClientBookingCalendar`; on phones they tap, then use − / +.
 - **Every booking is `pending` until the coach confirms or declines it. Nobody
-  auto-confirms.** Bookings with the sample coaches therefore stay pending.
-  A pending booking holds its slot.
+  auto-confirms.** A pending booking holds its slot. Clients can only book
+  their own (active) coach. The server checks every rule again
+  (`request_session`).
 - Session statuses: `confirmed`, `pending`, `declined`, `cancelled` (with
   `cancelledBy: "client"|"coach"`).
 - Clients can cancel only ≥ 24 h before the start (`cancelNoticeHours`); this
@@ -343,8 +399,17 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
 - The **⋯** badge on confirmed sessions dates from the old menu. It may get
   removed or turned into something meaningful.
 - `SegmentedTabs` is no longer used anywhere.
-- Coaches can't edit their public profile (bio, price, …): it's sample data in `CoachStore`.
-- No persistence: everything resets on restart.
+- Coaches can't edit their public profile (bio, price, …) in the app yet; it's
+  in `coach_profiles` (the seed fills it).
+- Dates are the device's local days; the server uses the coach's time zone
+  (`coach_today`). They only differ for devices outside Europe/Rome.
+- Live updates reload a whole store on each change notice. Fine at this size;
+  with many clients, reload only what changed (the trigger could send the
+  row id).
+- The client's directory of public coaches isn't live (only the client's own
+  coach notifies them).
+- The coach's calendar loads all their sessions at once; it needs paging by
+  week once there are many.
 
 **Open product questions** (ask the user rather than guess)
 - Should coaches be able to open one-off extra hours, or take multi-day time off?

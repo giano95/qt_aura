@@ -20,7 +20,7 @@ ScrollView {
 
     readonly property bool twoColumns: availableWidth >= 860
     // The client's next confirmed or pending session (CalendarStore)
-    readonly property var booked: Session.loggedIn ? CalendarStore.nextSessionFor(Session.user.email, Session.user.name) : null
+    readonly property var booked: Session.loggedIn ? CalendarStore.nextSessionFor(Session.user.email, Session.user.name, CalendarStore.revision) : null
     readonly property bool hasNext: booked !== null
     readonly property var nextSession: hasNext
         ? { date: new Date(CalendarStore.startMs(booked)), duration: qsTr("%1 min").arg(booked.end - booked.start),
@@ -28,7 +28,7 @@ ScrollView {
         : { date: new Date(), duration: "", topic: "", mode: "", pending: false }
 
     // The program stat comes from the coach's assignment; the rest is sample data
-    readonly property var me: Session.loggedIn ? ClientStore.clientByEmail(Session.user.email) : null
+    readonly property var me: Session.loggedIn ? ClientStore.clientByEmail(Session.user.email, ClientStore.revision) : null
     readonly property var programStatus: me ? ClientStore.programStatus(me) : ({ kind: "none", assignment: null })
     readonly property var stats: {
         const list = MockData.clientStats.slice(0, 2)

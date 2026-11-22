@@ -111,7 +111,7 @@ AuraDialog {
                         text: qsTr("Decline")
                         onClicked: {
                             const name = request.modelData.name
-                            CoachStore.declineRequest(request.modelData.email)
+                            CoachStore.declineRequest(request.modelData.id)
                             dialog.clientDeclined(name)
                         }
                     }
@@ -119,7 +119,7 @@ AuraDialog {
                         text: qsTr("Accept")
                         onClicked: {
                             const name = request.modelData.name
-                            CoachStore.acceptRequest(request.modelData.email)
+                            CoachStore.acceptRequest(request.modelData.id)
                             dialog.clientAccepted(name)
                         }
                     }

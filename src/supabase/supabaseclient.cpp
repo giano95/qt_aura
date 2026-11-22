@@ -1,5 +1,5 @@
-// See supabaseclient.h.
-#include "supabaseclient.h"
+// See supabaseclient.hpp.
+#include "supabaseclient.hpp"
 
 #include <QJsonArray>
 #include <QLoggingCategory>
@@ -95,25 +95,44 @@ void SupabaseClient::signOut()
     clearSession();
 }
 
+void SupabaseClient::resumeSession(QObject *context, const QString &refreshToken, Callback done)
+{
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("grant_type"), QStringLiteral("refresh_token"));
+    const QJsonObject body{{QStringLiteral("refresh_token"), refreshToken}};
+    send("POST", QStringLiteral("/auth/v1/token"), query, toJson(body), Auth::Anonymous, context,
+         [this, done](const Reply &reply) {
+             if (reply.ok())
+                 setSession(reply.data.object());
+             done(reply);
+         });
+}
+
 void SupabaseClient::setSession(const QJsonObject &tokenResponse)
 {
+    const QString oldRefreshToken = m_refreshToken;
     m_accessToken = tokenResponse.value(QStringLiteral("access_token")).toString();
     m_refreshToken = tokenResponse.value(QStringLiteral("refresh_token")).toString();
     m_userId = tokenResponse.value(QStringLiteral("user")).toObject().value(QStringLiteral("id")).toString();
     const int expiresIn = tokenResponse.value(QStringLiteral("expires_in")).toInt(3600);
     m_refreshTimer.start(qMax(10, expiresIn - kRefreshMarginSeconds) * 1000);
     emit sessionChanged();
+    if (m_refreshToken != oldRefreshToken)
+        emit refreshTokenChanged();
 }
 
 void SupabaseClient::clearSession()
 {
     const bool had = hasSession();
+    const bool hadToken = !m_refreshToken.isEmpty();
     m_accessToken.clear();
     m_refreshToken.clear();
     m_userId.clear();
     m_refreshTimer.stop();
     if (had)
         emit sessionChanged();
+    if (hadToken)
+        emit refreshTokenChanged();
 }
 
 void SupabaseClient::refreshSession(std::function<void(bool)> done)

@@ -8,18 +8,20 @@ sessions in the coach's free time.
 One app, two roles: after login the app opens the **coach app** or the
 **client app** depending on the account.
 
-> **Status: moving to the backend (Phase 2).** Login, signup, programs and the
-> exercise library use real Supabase data (an internet connection is needed).
-> Clients, coaching requests and the calendar still live in memory (QML
-> singletons with sample data) and reset when the app closes, until each store
-> moves to the backend. See [Roadmap](#roadmap).
+> **Status: on the backend (Phase 2).** Accounts, programs, the exercise library,
+> clients, coaching requests, invitations and the calendar all use real Supabase
+> data (an internet connection is needed), with live updates between devices, and
+> the app stays logged in between launches. Only parts of the two dashboards are
+> still sample content. See [Roadmap](#roadmap).
 
 ---
 
 ## Run it
 
-Requirements: **Qt 6.10+** (developed on **Qt 6.12.0**), CMake 3.16+, Ninja.
-Runs on **macOS** and **Windows** (MinGW kit).
+Requirements: **Qt 6.10+** (developed on **Qt 6.12.0**) with the **Qt WebSockets**
+add-on (Maintenance Tool → Qt 6.12.0 → Additional Libraries), CMake 3.16+, Ninja.
+Runs on **macOS** and **Windows** (MinGW kit). The first CMake configure
+downloads QtKeychain (saved login), so it needs an internet connection.
 
 **Qt Creator:** open `CMakeLists.txt`, pick the Qt 6.12 kit, press Run.
 
@@ -61,9 +63,9 @@ The window opens at 1920×1080, or smaller to fit the screen.
 
 Every account in the demo data uses the password `password` (other coaches and
 clients: `<first>.<last>@example.com`). Accounts created with **Sign up** are
-real and stay in the database, but until the other stores move to the backend
-the screens behind login still show the in-memory sample data. Useful ways to
-try things:
+real and stay in the database, like every change you make. Changes show up
+live in other open apps: run two copies, one as the coach and one as a client,
+to see it. Useful ways to try things:
 
 - **Coach requests:** sign up a new client, request Giulia from **My coach**,
   then log in as the coach → **Clients** → **Accept clients**.
@@ -112,18 +114,18 @@ CMakeLists.txt          Qt 6 CMake project; every QML file must be listed in QML
 main.cpp                Creates the Supabase client, loads the QML module "qt_aura"
 Main.qml                Window + router: auth flow / coach app / client app
 src/                    C++ (Phase 2)
-  supabase/               SupabaseClient: auth, token refresh, tables, RPC calls
+  supabase/               SupabaseClient: auth, token refresh, tables, RPC calls;
+                          RealtimeClient: live updates (Supabase Realtime)
   models/                 value types QML reads (AuraUser, …)
   stores/                 C++ stores, QML singletons: Session (login / signup / logout),
-                          ProgramStore (programs, exercise library)
+                          ProgramStore (programs, exercise library), ClientStore
+                          (clients, assignments), CoachStore (directory, requests,
+                          invitations, visibility), CalendarStore (hours, blocked
+                          slots, sessions, bookings); StoreBase (what they share)
 supabase/               Database: migrations/ (schema, rules, RLS) and seed.sql (demo data)
 qml/
   theme/Theme.qml       Design tokens (colors, radii, font sizes), light/dark
-  services/             In-memory data (QML singletons), moving to C++ one by one
-    ClientStore.qml       the coach's clients and program assignments
-    CalendarStore.qml     working hours, blocked slots, sessions and bookings
-    CoachStore.qml        coach directory, public/private, coach–client requests and invitations
-    MockData.qml          leftover sample content for the dashboards
+  services/MockData.qml  leftover sample content for the dashboards
   components/           Reusable controls (AuraButton, AuraDialog, Card, Chip, AppShell, …)
   screens/
     auth/                 welcome, login, signup
@@ -134,11 +136,11 @@ importedcontent/        Qt Creator's Figma import folder (unused)
 
 ### Architecture in one paragraph
 
-QML screens never hold data of their own. They call **store singletons** in
-`qml/services/`, which own the data and the business rules (program status,
-free slots, booking states, …). In Phase 2 each store becomes a C++ class
-backed by the API **with the same functions and properties**, so the screens
-stay as they are. All styling comes from `Theme`, and all controls use
+QML screens never hold data of their own. They call **store singletons**, C++
+classes in `src/stores/` that load the signed-in user's data from Supabase and
+own the business rules (program status, free slots, booking states, …).
+Changes show up at once and go to the server in order; the database enforces
+the same rules again (row-level security and SQL functions). All styling comes from `Theme`, and all controls use
 `QtQuick.Controls.Basic` with custom looks.
 
 ---
@@ -149,7 +151,7 @@ stay as they are. All styling comes from `Theme`, and all controls use
 |---|---|---|
 | 0 | Scope and design every screen in QML, with sample data | **Mostly done.** Messages and Progress are still to design |
 | 1 | Backend: Supabase (Postgres) in an EU region, row-level security, auth, migrations in git | **Done.** Schema, rules and demo data in `supabase/` |
-| 2 | Qt ↔ backend: C++ `SupabaseClient` (HTTPS / JSON / tokens), replace stores with C++; QtKeychain later | **In progress.** Done: `SupabaseClient`, `Session`, `ProgramStore`. Next: `ClientStore` + `CoachStore`, then `CalendarStore` |
+| 2 | Qt ↔ backend: C++ `SupabaseClient` (HTTPS / JSON / tokens), replace stores with C++; QtKeychain later | **Mostly done.** All stores are C++ on Supabase, live updates (Realtime), stay logged in (QtKeychain). Left: unit tests |
 | 3 | Remaining core features on real data (messages, progress, session notes) | Not started |
 | 4 | Offline: SQLite cache, sync queue | Not started |
 | 5 | Desktop release: packaging, code signing, CI installers | Not started |
@@ -161,9 +163,10 @@ LGPL compliance awkward, so decide on a Qt commercial license first.
 **Data protection:** client data includes health data (a special category under
 GDPR). Plan consent, data export and deletion into Phase 1.
 
-### Tables Phase 1 will need (from the current stores)
+### Database tables
 
-coaches (public profile, visibility) · clients · coach_client_links (requests /
-invitations / active) · programs · program_days · program_exercises (with
-per-week changes) · exercises · program_assignments · working_hours ·
-blocked_slots · sessions (status, length, who cancelled)
+profiles (every account) · coach_profiles (public profile, visibility) ·
+coachings (requests, invitations, active and past coach–client links) ·
+assignments · programs · program_days · program_entries (with per-week
+changes) · exercises (built-in + each coach's own) · working_hours ·
+blocked_slots · sessions (status, who cancelled). See `supabase/migrations/`.

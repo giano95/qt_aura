@@ -6,10 +6,10 @@ import QtQuick.Controls.Basic
 AuraDialog {
     id: dialog
 
-    property int coachId: 0
+    property string coachId: ""
     property bool submitted: false
 
-    readonly property var coach: CoachStore.coachById(coachId)
+    readonly property var coach: CoachStore.coachById(coachId, CoachStore.revision)
     readonly property string firstName: coach ? coach.name.split(" ")[0] : ""
     readonly property string goalError:
         submitted && goalField.text.trim().length < 3 ? qsTr("Tell %1 what you'd like to achieve.").arg(firstName) : ""

@@ -48,6 +48,10 @@ public:
     // ---- auth ---------------------------------------------------------------
     bool hasSession() const { return !m_accessToken.isEmpty(); }
     QString userId() const { return m_userId; }
+    // For RealtimeClient, which opens its own WebSocket connection
+    QString baseUrl() const { return m_baseUrl; }
+    QString apiKey() const { return m_apiKey; }
+    QString accessToken() const { return m_accessToken; }
 
     void signIn(QObject *context, const QString &email, const QString &password, Callback done);
     // metadata becomes raw_user_meta_data ({name, role}); the signup trigger
@@ -55,6 +59,11 @@ public:
     void signUp(QObject *context, const QString &email, const QString &password,
                 const QJsonObject &metadata, Callback done);
     void signOut();
+    // Starts a session from a saved refresh token ("stay logged in")
+    void resumeSession(QObject *context, const QString &refreshToken, Callback done);
+    // The token to save for resumeSession(); changes on every refresh
+    // (Supabase rotates it), "" when logged out
+    QString refreshToken() const { return m_refreshToken; }
 
     // ---- data (as the signed-in user) ---------------------------------------
     // GET /rest/v1/<table>?<query>, e.g. query "select=id,name" + "id=eq.<uuid>"
@@ -66,8 +75,15 @@ public:
     // POST /rest/v1/rpc/<function>
     void rpc(QObject *context, const QString &function, const QJsonObject &args, Callback done);
 
+    // `table` changed on the server; stores that show data from it reload.
+    // `source` is the store that made the change (it isn't told), or the
+    // RealtimeClient for changes made elsewhere. "*" means any table.
+    void notifyChanged(const QString &table, QObject *source) { emit dataChanged(table, source); }
+
 signals:
     void sessionChanged();
+    void refreshTokenChanged();
+    void dataChanged(const QString &table, QObject *source);
     // The refresh token was rejected: the user has to log in again
     void sessionExpired();
 

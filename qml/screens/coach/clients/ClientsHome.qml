@@ -8,16 +8,16 @@ import QtQuick.Controls.Basic
 Item {
     id: page
 
-    signal openRequested(int clientId)
+    signal openRequested(string clientId)
 
     property string filter: "all"
 
-    readonly property var results: ClientStore.search(search.text, filter)
+    readonly property var results: ClientStore.search(search.text, filter, ClientStore.revision)
     readonly property bool wide: scroll.availableWidth >= 760
     readonly property int programColumnWidth: 290
     readonly property int checkInColumnWidth: 110
     readonly property int actionColumnWidth: 150
-    readonly property int expiredCount: ClientStore.count("expired")
+    readonly property int expiredCount: ClientStore.count("expired", ClientStore.revision)
     readonly property int requestCount: CoachStore.pendingRequests.length
 
     readonly property var filters: [
@@ -47,16 +47,16 @@ Item {
             // Profile visibility decides how new clients join (see CoachStore)
             AuraButton {
                 variant: "secondary"
-                text: CoachStore.demoIsPublic ? qsTr("Public profile") : qsTr("Private profile")
+                text: CoachStore.isPublic ? qsTr("Public profile") : qsTr("Private profile")
                 onClicked: visibilityDialog.openEditor()
             }
             AuraButton {
-                visible: !CoachStore.demoIsPublic
+                visible: !CoachStore.isPublic
                 text: qsTr("Invite client")
                 onClicked: inviteDialog.openNew()
             }
             AuraButton {
-                visible: CoachStore.demoIsPublic
+                visible: CoachStore.isPublic
                 text: page.requestCount > 0 ? qsTr("Accept clients · %1").arg(page.requestCount) : qsTr("Accept clients")
                 onClicked: requestsDialog.open()
             }
@@ -88,7 +88,7 @@ Item {
                 FilterChip {
                     required property var modelData
                     text: modelData.label
-                    count: String(ClientStore.count(modelData.key))
+                    count: String(ClientStore.count(modelData.key, ClientStore.revision))
                     selected: page.filter === modelData.key
                     onClicked: page.filter = modelData.key
                 }

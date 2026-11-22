@@ -10,7 +10,7 @@ import QtQuick.Controls.Basic
 AuraDialog {
     id: dialog
 
-    property int coachId: 0
+    property string coachId: ""
     property double dayMs: 0
     property int start: 0
     property int end: 0
@@ -18,9 +18,8 @@ AuraDialog {
     property string mode: ""
     property string error: ""
 
-    readonly property var coach: CoachStore.coachById(coachId)
+    readonly property var coach: CoachStore.coachById(coachId, CoachStore.revision)
     readonly property string firstName: coach ? coach.name.split(" ")[0] : ""
-    readonly property bool isDemoCoach: coachId === CoachStore.demoCoachId
     readonly property var types: [qsTr("Training"), qsTr("Technique session"), qsTr("Weekly check-in"), qsTr("Program review")]
     readonly property var modes: !coach ? []
                                  : coach.inPerson && coach.online ? [qsTr("In person"), qsTr("Video call")]
@@ -42,7 +41,7 @@ AuraDialog {
 
     function send() {
         // Someone else may have taken the slot meanwhile
-        if (!CalendarStore.isRangeFree(coachId, dayMs, start, end)) {
+        if (!CalendarStore.isRangeFree(coachId, dayMs, start, end, CalendarStore.revision)) {
             error = qsTr("This time isn't free any more. Please choose another one.")
             return
         }
@@ -152,9 +151,7 @@ AuraDialog {
         Layout.fillWidth: true
         text: qsTr("%1 confirms or declines every request. Until then it shows as waiting for confirmation, and the time is held for you. You can cancel up to %2 hours before it starts.")
                   .arg(dialog.firstName).arg(CalendarStore.cancelNoticeHours)
-              + "<br>" + (dialog.isDemoCoach
-                          ? qsTr("Prototype: log in as %1 and open Calendar to answer.").arg(dialog.coach ? dialog.coach.email : "")
-                          : qsTr("Prototype: only Giulia Rossi has a coach account, so this request will stay pending."))
+              + "<br>" + qsTr("Demo: to answer it, log in as %1 (password: password) and open Calendar.").arg(dialog.coach ? dialog.coach.email : "")
     }
 
     Notice {

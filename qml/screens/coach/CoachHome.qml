@@ -12,7 +12,7 @@ AppShell {
         [],
         [
             { count: CoachStore.pendingRequests.length, tone: "primary", label: qsTr("new requests") },
-            { count: ClientStore.count("expired"), tone: "danger", label: qsTr("expired programs") }
+            { count: ClientStore.count("expired", ClientStore.revision), tone: "danger", label: qsTr("expired programs") }
         ],
         [
             { count: CalendarStore.pendingBookings.length, tone: "primary", label: qsTr("booking requests") }

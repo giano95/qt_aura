@@ -9,18 +9,18 @@ import QtQuick.Controls.Basic
 AuraDialog {
     id: dialog
 
-    property int onlyId: 0        // 0 = all pending requests
+    property string onlyId: ""        // "" = all pending requests
 
-    readonly property var requests: onlyId !== 0
-                                    ? [CalendarStore.sessionById(onlyId)].filter(s => s !== null)
+    readonly property var requests: onlyId !== ""
+                                    ? [CalendarStore.sessionById(onlyId, CalendarStore.revision)].filter(s => s !== null)
                                     : CalendarStore.pendingBookings
 
     signal sessionConfirmed(string clientName)
     signal sessionDeclined(string clientName)
-    signal cancelRequested(int sessionId)
+    signal cancelRequested(string sessionId)
 
     function openAll() {
-        onlyId = 0
+        onlyId = ""
         open()
     }
 
@@ -34,14 +34,14 @@ AuraDialog {
              + CalendarStore.formatMinutes(session.start) + "–" + CalendarStore.formatMinutes(session.end)
     }
 
-    title: onlyId === 0 ? qsTr("Booking requests")
+    title: onlyId === "" ? qsTr("Booking requests")
          : requests.length > 0 && requests[0].status === "pending" ? qsTr("Session request")
          : qsTr("Session")
     preferredWidth: 620
 
 
     Label {
-        visible: dialog.onlyId === 0 && dialog.requests.length > 0
+        visible: dialog.onlyId === "" && dialog.requests.length > 0
         text: qsTr("Sessions your clients booked in your free slots. They're held for them until you answer.")
         color: Theme.textMuted
         wrapMode: Text.Wrap
@@ -168,7 +168,7 @@ AuraDialog {
                             const name = request.modelData.client
                             CalendarStore.declineSession(request.modelData.id)
                             dialog.sessionDeclined(name)
-                            if (dialog.onlyId !== 0)
+                            if (dialog.onlyId !== "")
                                 dialog.close()
                         }
                     }
@@ -178,7 +178,7 @@ AuraDialog {
                             const name = request.modelData.client
                             CalendarStore.confirmSession(request.modelData.id)
                             dialog.sessionConfirmed(name)
-                            if (dialog.onlyId !== 0)
+                            if (dialog.onlyId !== "")
                                 dialog.close()
                         }
                     }

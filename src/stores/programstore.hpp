@@ -7,19 +7,17 @@
 // store reloads and emits errorOccurred.
 //
 // Bindings that call a function reading store data must pass `revision` as the
-// last argument, e.g. ProgramStore.searchExercises(text, muscle, ProgramStore.revision),
-// otherwise they don't refresh when the data changes.
+// last argument (see StoreBase), e.g.
+// ProgramStore.searchExercises(text, muscle, ProgramStore.revision).
 #pragma once
 
-#include "program.h"
+#include "program.hpp"
+#include "storebase.hpp"
 
 #include <QJSValue>
-#include <QObject>
 #include <QtQml/qqmlregistration.h>
 
-class SupabaseClient;
-
-class ProgramStore : public QObject
+class ProgramStore : public StoreBase
 {
     Q_OBJECT
     QML_ELEMENT
@@ -32,9 +30,6 @@ class ProgramStore : public QObject
 
     Q_PROPERTY(QList<Exercise> exercises READ exercises NOTIFY revisionChanged FINAL)
     Q_PROPERTY(QList<Program> programs READ programs NOTIFY revisionChanged FINAL)
-    // Bumped on every change of exercises or programs
-    Q_PROPERTY(int revision READ revision NOTIFY revisionChanged FINAL)
-    Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged FINAL)
 
 public:
     explicit ProgramStore(QObject *parent = nullptr);
@@ -44,8 +39,6 @@ public:
     QStringList weeklyKeys() const { return ProgramEntry::weeklyKeys(); }
     QList<Exercise> exercises() const { return m_exercises; }
     QList<Program> programs() const { return m_programs; }
-    int revision() const { return m_revision; }
-    bool loading() const { return m_pendingLoads > 0; }
 
     // ---- exercises (pass `revision` last from bindings) ---------------------
     // The exercise, or null
@@ -106,27 +99,10 @@ public:
     // "Edited today", "Edited 3 days ago", ...
     Q_INVOKABLE QString editedLabel(double ms) const;
 
-signals:
-    void revisionChanged();
-    void loadingChanged();
-    // A change was refused or the data couldn't be loaded (translated message)
-    void errorOccurred(const QString &message);
-
-private:
-    void onSessionChanged();
-    void load();
-    void clear();
-    void changed();
-    void fail(const QString &code);
-    QJSValue toJs(const QVariantMap &map) const;
-    static QString newId();
-    static QString errorText(const QString &code);
-
-    SupabaseClient *m_client;
-    QString m_loadedUser;
-    int m_loadGeneration = 0;
-    int m_pendingLoads = 0;
-    int m_revision = 0;
+protected:
+    void load() override;
+    bool clearData() override;
+    QString errorText(const QString &code) const override;
     QList<Exercise> m_exercises;
     QList<Program> m_programs;
 };

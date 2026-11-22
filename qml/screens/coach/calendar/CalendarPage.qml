@@ -49,8 +49,8 @@ Item {
     ConfirmDialog {
         id: cancelSessionDialog
 
-        property int sessionId: 0
-        readonly property var session: CalendarStore.sessionById(sessionId)
+        property string sessionId: ""
+        readonly property var session: CalendarStore.sessionById(sessionId, CalendarStore.revision)
 
         function ask(id) {
             sessionId = id

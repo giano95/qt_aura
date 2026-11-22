@@ -1,14 +1,13 @@
-// See programstore.h.
-#include "programstore.h"
+// See programstore.hpp.
+#include "programstore.hpp"
 
-#include "supabaseclient.h"
+#include "supabaseclient.hpp"
 
 #include <QDate>
 #include <QDateTime>
 #include <QJSEngine>
 #include <QJsonArray>
 #include <QLocale>
-#include <QUuid>
 
 #include <algorithm>
 
@@ -22,13 +21,12 @@ bool containsText(const QString &haystack, const QString &needle)
 } // namespace
 
 ProgramStore::ProgramStore(QObject *parent)
-    : QObject(parent)
-    , m_client(SupabaseClient::instance())
+    : StoreBase(parent)
 {
-    connect(m_client, &SupabaseClient::sessionChanged, this, &ProgramStore::onSessionChanged);
-    // The engine creates the store the first time a screen uses it, which can
-    // be after login
-    onSessionChanged();
+    // A client's programs change with their coaching and assignments; a
+    // coach's when they edit them on another device
+    start({QStringLiteral("coachings"), QStringLiteral("assignments"), QStringLiteral("programs"),
+           QStringLiteral("exercises")});
 }
 
 QStringList ProgramStore::muscleGroups() const
@@ -51,39 +49,19 @@ QStringList ProgramStore::equipmentTypes() const
 
 // ---- loading ------------------------------------------------------------------
 
-void ProgramStore::onSessionChanged()
-{
-    if (!m_client->hasSession()) {
-        clear();
-        return;
-    }
-    // sessionChanged also fires on every token refresh: reload only for a new user
-    if (m_client->userId() != m_loadedUser) {
-        clear();
-        m_loadedUser = m_client->userId();
-        load();
-    }
-}
-
 void ProgramStore::load()
 {
-    const int generation = ++m_loadGeneration;
-    m_pendingLoads = 2;
-    emit loadingChanged();
-    const auto done = [this] {
-        if (--m_pendingLoads == 0)
-            emit loadingChanged();
-    };
+    const int generation = beginLoad(2);
 
     QUrlQuery exerciseQuery;
     exerciseQuery.addQueryItem(QStringLiteral("select"),
                                QStringLiteral("id,coach_id,name,muscle,equipment,instructions,video_url"));
     exerciseQuery.addQueryItem(QStringLiteral("order"), QStringLiteral("name.asc"));
     m_client->select(this, QStringLiteral("exercises"), exerciseQuery,
-                     [this, generation, done](const SupabaseClient::Reply &reply) {
-                         if (generation != m_loadGeneration)
+                     [this, generation](const SupabaseClient::Reply &reply) {
+                         if (!isCurrent(generation))
                              return;
-                         done();
+                         endLoadStep();
                          if (!reply.ok()) {
                              emit errorOccurred(errorText(reply.errorCode));
                              return;
@@ -104,10 +82,10 @@ void ProgramStore::load()
     programQuery.addQueryItem(QStringLiteral("program_days.order"), QStringLiteral("position.asc"));
     programQuery.addQueryItem(QStringLiteral("program_days.program_entries.order"), QStringLiteral("position.asc"));
     m_client->select(this, QStringLiteral("programs"), programQuery,
-                     [this, generation, done](const SupabaseClient::Reply &reply) {
-                         if (generation != m_loadGeneration)
+                     [this, generation](const SupabaseClient::Reply &reply) {
+                         if (!isCurrent(generation))
                              return;
-                         done();
+                         endLoadStep();
                          if (!reply.ok()) {
                              emit errorOccurred(errorText(reply.errorCode));
                              return;
@@ -120,53 +98,24 @@ void ProgramStore::load()
                      });
 }
 
-void ProgramStore::clear()
+bool ProgramStore::clearData()
 {
-    ++m_loadGeneration;     // ignore replies still on their way
-    m_loadedUser.clear();
-    const bool wasLoading = loading();
-    m_pendingLoads = 0;
-    if (wasLoading)
-        emit loadingChanged();
     if (m_exercises.isEmpty() && m_programs.isEmpty())
-        return;
+        return false;
     m_exercises.clear();
     m_programs.clear();
-    changed();
+    return true;
 }
 
-void ProgramStore::changed()
+QString ProgramStore::errorText(const QString &code) const
 {
-    ++m_revision;
-    emit revisionChanged();
-}
-
-// A write was refused: the local copy may be wrong, so take the server's
-void ProgramStore::fail(const QString &code)
-{
-    emit errorOccurred(errorText(code));
-    if (m_client->hasSession())
-        load();
-}
-
-QString ProgramStore::newId()
-{
-    return QUuid::createUuid().toString(QUuid::WithoutBraces);
-}
-
-QString ProgramStore::errorText(const QString &code)
-{
-    if (code == QLatin1String("network"))
-        return tr("Can't reach the server. Check your internet connection.");
     if (code == QLatin1String("23503"))     // foreign key: exercise still used
         return tr("This exercise is used in a program, so it can't be deleted.");
     if (code == QLatin1String("23505"))     // unique: exercise name
         return tr("An exercise with this name already exists.");
     if (code == QLatin1String("invalid_program"))
         return tr("The program couldn't be saved: check its name and exercises.");
-    if (code == QLatin1String("not_allowed") || code == QLatin1String("42501"))
-        return tr("You can't change this.");
-    return tr("Something went wrong (%1). Please try again.").arg(code);
+    return StoreBase::errorText(code);
 }
 
 // ---- exercises ------------------------------------------------------------------
@@ -248,18 +197,16 @@ QString ProgramStore::saveExercise(const QVariantMap &input)
                     {QStringLiteral("equipment"), exercise.equipment},
                     {QStringLiteral("instructions"), exercise.instructions},
                     {QStringLiteral("video_url"), exercise.videoUrl}};
-    const auto done = [this](const SupabaseClient::Reply &reply) {
-        if (!reply.ok())
-            fail(reply.errorCode);
-    };
     if (isNew) {
         row.insert(QStringLiteral("id"), exercise.id);
-        row.insert(QStringLiteral("coach_id"), m_client->userId());
-        m_client->insert(this, QStringLiteral("exercises"), row, done);
+        row.insert(QStringLiteral("coach_id"), userId());
+        write([this, row](SupabaseClient::Callback done) { m_client->insert(this, QStringLiteral("exercises"), row, done); });
     } else {
         QUrlQuery filter;
         filter.addQueryItem(QStringLiteral("id"), QStringLiteral("eq.") + exercise.id);
-        m_client->update(this, QStringLiteral("exercises"), filter, row, done);
+        write([this, filter, row](SupabaseClient::Callback done) {
+            m_client->update(this, QStringLiteral("exercises"), filter, row, done);
+        });
     }
     return exercise.id;
 }
@@ -274,10 +221,7 @@ bool ProgramStore::deleteExercise(const QString &id)
     changed();
     QUrlQuery filter;
     filter.addQueryItem(QStringLiteral("id"), QStringLiteral("eq.") + id);
-    m_client->remove(this, QStringLiteral("exercises"), filter, [this](const SupabaseClient::Reply &reply) {
-        if (!reply.ok())
-            fail(reply.errorCode);
-    });
+    write([this, filter](SupabaseClient::Callback done) { m_client->remove(this, QStringLiteral("exercises"), filter, done); });
     return true;
 }
 
@@ -293,15 +237,6 @@ QList<Program> ProgramStore::searchPrograms(const QString &query, const QVariant
     std::sort(result.begin(), result.end(),
               [](const Program &a, const Program &b) { return a.updatedAt > b.updatedAt; });
     return result;
-}
-
-// Through QJsonObject: that yields real JS objects and arrays all the way down,
-// whereas a QVariantMap's nested lists become list wrappers that hand out a new
-// copy of each element on every read.
-QJSValue ProgramStore::toJs(const QVariantMap &map) const
-{
-    QJSEngine *engine = qjsEngine(this);
-    return engine ? engine->toScriptValue(QJsonObject::fromVariantMap(map)) : QJSValue();
 }
 
 QVariantMap ProgramStore::programDraft(const QString &id) const
@@ -392,11 +327,7 @@ QString ProgramStore::saveProgram(const QVariant &draft)
     m_programs.append(program);
     changed();
 
-    m_client->rpc(this, QStringLiteral("save_program"), {{QStringLiteral("p"), program.toSaveJson()}},
-                  [this](const SupabaseClient::Reply &reply) {
-                      if (!reply.ok())
-                          fail(reply.errorCode);
-                  });
+    writeRpc(QStringLiteral("save_program"), {{QStringLiteral("p"), program.toSaveJson()}});
     return program.id;
 }
 
@@ -406,10 +337,7 @@ void ProgramStore::deleteProgram(const QString &id)
     changed();
     QUrlQuery filter;
     filter.addQueryItem(QStringLiteral("id"), QStringLiteral("eq.") + id);
-    m_client->remove(this, QStringLiteral("programs"), filter, [this](const SupabaseClient::Reply &reply) {
-        if (!reply.ok())
-            fail(reply.errorCode);
-    });
+    write([this, filter](SupabaseClient::Callback done) { m_client->remove(this, QStringLiteral("programs"), filter, done); });
 }
 
 // ---- per-week values ----------------------------------------------------------

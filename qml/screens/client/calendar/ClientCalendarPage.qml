@@ -16,12 +16,12 @@ Item {
     readonly property var coach: CoachStore.myCoach
     readonly property bool hasCoach: coach !== null && CoachStore.myRelation !== null && CoachStore.myRelation.status === "active"
     readonly property string firstName: coach ? coach.name.split(" ")[0] : ""
-    readonly property var mySessions: Session.loggedIn ? CalendarStore.clientSessions(Session.user.email, Session.user.name) : []
+    readonly property var mySessions: Session.loggedIn ? CalendarStore.clientSessions(Session.user.email, Session.user.name, CalendarStore.revision) : []
     readonly property var upcoming: mySessions.filter(s => CalendarStore.endMs(s) > CalendarStore.now && s.status !== "cancelled")
     readonly property var past: mySessions.filter(s => CalendarStore.endMs(s) <= CalendarStore.now && s.status === "confirmed")
                                           .reverse().slice(0, 6)
     readonly property bool wide: scroll.availableWidth >= 900
-    property int cancelId: 0
+    property string cancelId: ""
 
     signal navigateRequested(int index)
 
@@ -61,7 +61,7 @@ Item {
             ClientBookingCalendar {
                 visible: page.hasCoach
                 Layout.fillWidth: true
-                coachId: page.coach ? page.coach.id : 0
+                coachId: page.coach ? page.coach.id : ""
                 wide: page.wide
                 onRequestRequested: (dayMs, start, end) => bookDialog.openFor(page.coach.id, dayMs, start, end)
             }
@@ -93,8 +93,8 @@ Item {
                             required property var modelData
                             Layout.fillWidth: true
                             session: modelData
-                            canCancel: CalendarStore.canClientCancel(modelData)
-                            tooLateToCancel: CalendarStore.isActive(modelData) && !CalendarStore.canClientCancel(modelData)
+                            canCancel: CalendarStore.canClientCancel(modelData, CalendarStore.revision)
+                            tooLateToCancel: CalendarStore.isActive(modelData) && !CalendarStore.canClientCancel(modelData, CalendarStore.revision)
                             onCancelRequested: {
                                 page.cancelId = modelData.id
                                 cancelDialog.open()
@@ -156,7 +156,7 @@ Item {
 
     ConfirmDialog {
         id: cancelDialog
-        readonly property var session: CalendarStore.sessionById(page.cancelId)
+        readonly property var session: CalendarStore.sessionById(page.cancelId, CalendarStore.revision)
         title: session && session.status === "pending" ? qsTr("Cancel your request?") : qsTr("Cancel this session?")
         message: session
                  ? qsTr("%1, %2–%3 with %4. The time will be free again.")

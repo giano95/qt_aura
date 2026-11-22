@@ -1,5 +1,5 @@
-// See program.h.
-#include "program.h"
+// See program.hpp.
+#include "program.hpp"
 
 #include <QDateTime>
 #include <QJsonArray>

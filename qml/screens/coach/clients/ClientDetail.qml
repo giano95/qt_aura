@@ -9,9 +9,9 @@ import QtQuick.Controls.Basic
 Item {
     id: page
 
-    property int clientId: 0
+    property string clientId: ""
 
-    readonly property var client: ClientStore.clientById(clientId)
+    readonly property var client: ClientStore.clientById(clientId, ClientStore.revision)
     readonly property var status: client ? ClientStore.programStatus(client) : ({ kind: "none", assignment: null })
     readonly property var current: status.assignment
     readonly property var history: client ? ClientStore.pastAssignments(client) : []

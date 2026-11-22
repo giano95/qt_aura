@@ -6,12 +6,12 @@ import QtQuick.Controls.Basic
 AuraDialog {
     id: dialog
 
-    property int coachId: 0
+    property string coachId: ""
     property bool canRequest: true          // false when viewing a pending request
 
-    readonly property var coach: CoachStore.coachById(coachId)
+    readonly property var coach: CoachStore.coachById(coachId, CoachStore.revision)
 
-    signal requestRequested(int coachId)
+    signal requestRequested(string coachId)
 
     function openFor(id, allowRequest) {
         coachId = id

@@ -5,9 +5,30 @@ project(qt_aura VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Network)
+find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Network WebSockets)
 
 qt_standard_project_setup(REQUIRES 6.10)
+
+# QtKeychain: the saved login lives in the system's secure storage (macOS
+# Keychain, Windows Credential Manager). Downloaded and built with the app as
+# a static library, so there's nothing extra to install or ship.
+include(FetchContent)
+FetchContent_Declare(qtkeychain
+    URL https://github.com/frankosterfeld/qtkeychain/archive/refs/tags/0.18.0.tar.gz
+    URL_HASH SHA256=837af59f2b950760a73eff81ccae817f7d3051183b447438dc610bb984a41691
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+set(BUILD_SHARED_LIBS OFF)
+set(BUILD_TRANSLATIONS OFF)
+set(BUILD_TEST_APPLICATION OFF)
+set(BUILD_TESTING OFF)
+FetchContent_MakeAvailable(qtkeychain)
+unset(BUILD_SHARED_LIBS)
+unset(BUILD_TRANSLATIONS)
+unset(BUILD_TEST_APPLICATION)
+unset(BUILD_TESTING)
+# Static: no dllimport/dllexport in its headers (Windows)
+target_compile_definitions(qt6keychain PUBLIC QT6KEYCHAIN_STATIC_DEFINE)
 
 # Supabase project the app talks to. The publishable key is meant to ship in
 # client apps: row-level security in the database decides what each user can
@@ -28,9 +49,6 @@ qt_add_executable(appqt_aura
 set(AURA_QML_SINGLETONS
     qml/theme/Theme.qml
     qml/services/MockData.qml
-    qml/services/ClientStore.qml
-    qml/services/CalendarStore.qml
-    qml/services/CoachStore.qml
 )
 set_source_files_properties(${AURA_QML_SINGLETONS}
     PROPERTIES QT_QML_SINGLETON_TYPE TRUE
@@ -40,11 +58,19 @@ qt_add_qml_module(appqt_aura
     URI qt_aura
     # C++ stores (QML singletons), value types and the backend client
     SOURCES
-        src/supabase/supabaseclient.h src/supabase/supabaseclient.cpp
-        src/models/aurauser.h
-        src/models/program.h src/models/program.cpp
-        src/stores/session.h src/stores/session.cpp
-        src/stores/programstore.h src/stores/programstore.cpp
+        src/supabase/supabaseclient.hpp src/supabase/supabaseclient.cpp
+        src/supabase/realtimeclient.hpp src/supabase/realtimeclient.cpp
+        src/supabase/sessionstorage.hpp src/supabase/sessionstorage.cpp
+        src/models/aurauser.hpp
+        src/models/program.hpp src/models/program.cpp
+        src/models/coaching.hpp src/models/coaching.cpp
+        src/models/calendar.hpp src/models/calendar.cpp
+        src/stores/storebase.hpp src/stores/storebase.cpp
+        src/stores/session.hpp src/stores/session.cpp
+        src/stores/programstore.hpp src/stores/programstore.cpp
+        src/stores/clientstore.hpp src/stores/clientstore.cpp
+        src/stores/coachstore.hpp src/stores/coachstore.cpp
+        src/stores/calendarstore.hpp src/stores/calendarstore.cpp
     QML_FILES
         Main.qml
         ${AURA_QML_SINGLETONS}
@@ -143,7 +169,7 @@ set_target_properties(appqt_aura PROPERTIES
 )
 
 target_link_libraries(appqt_aura
-    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network
+    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Network Qt6::WebSockets qt6keychain
 )
 
 # Headers are included by file name (also by the generated QML type registration)

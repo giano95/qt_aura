@@ -15,7 +15,7 @@ import QtQuick.Controls.Basic
 ColumnLayout {
     id: root
 
-    property int coachId: 0
+    property string coachId: ""
     property bool wide: true
     property double weekStart: CalendarStore.mondayOf(Date.now())
     property int selectedDay: (new Date().getDay() + 6) % 7      // shown day on narrow screens
@@ -32,12 +32,12 @@ ColumnLayout {
     readonly property double lastWeek: CalendarStore.addDays(firstWeek, 7 * (CalendarStore.bookingWeeks - 1))
     readonly property var days: [0, 1, 2, 3, 4, 5, 6].map(i => CalendarStore.addDays(weekStart, i))
     readonly property var shownIndexes: wide ? [0, 1, 2, 3, 4, 5, 6] : [selectedDay]
-    readonly property var range: CalendarStore.coachVisibleRange(coachId, weekStart)
+    readonly property var range: CalendarStore.coachVisibleRange(coachId, weekStart, CalendarStore.revision)
     readonly property int slotCount: (range.to - range.from) / CalendarStore.slotMinutes
     readonly property int timeColumnWidth: 52
     readonly property int rowHeight: wide ? 24 : 34
     readonly property string coachFirstName: {
-        const c = CoachStore.coachById(coachId)
+        const c = CoachStore.coachById(coachId, CoachStore.revision)
         return c ? c.name.split(" ")[0] : ""
     }
 
@@ -46,7 +46,7 @@ ColumnLayout {
         if (!Session.loggedIn)
             return []
         const list = []
-        const mine = CalendarStore.clientSessions(Session.user.email, Session.user.name)
+        const mine = CalendarStore.clientSessions(Session.user.email, Session.user.name, CalendarStore.revision)
                                   .filter(s => CalendarStore.isActive(s) && s.coachId === coachId)
         shownIndexes.forEach((dayIndex, column) => {
             const key = CalendarStore.dateKey(days[dayIndex])
@@ -58,7 +58,7 @@ ColumnLayout {
     // Free 30-minute slots in the shown week
     readonly property int freeSlotCount: {
         let n = 0
-        days.forEach(d => { for (let m = range.from; m < range.to; m += CalendarStore.slotMinutes) if (CalendarStore.isCoachSlotFree(coachId, d, m)) ++n })
+        days.forEach(d => { for (let m = range.from; m < range.to; m += CalendarStore.slotMinutes) if (CalendarStore.isCoachSlotFree(coachId, d, m, CalendarStore.revision)) ++n })
         return n
     }
 
@@ -70,7 +70,7 @@ ColumnLayout {
     }
 
     function isFree(dayIndex, minute) {
-        return CalendarStore.isCoachSlotFree(coachId, days[dayIndex], minute)
+        return CalendarStore.isCoachSlotFree(coachId, days[dayIndex], minute, CalendarStore.revision)
     }
 
     function isMine(dayIndex, minute) {
@@ -84,7 +84,7 @@ ColumnLayout {
             return "mine"
         if (isFree(dayIndex, minute))
             return "free"
-        return CalendarStore.isCoachWorkingSlot(coachId, days[dayIndex], minute) ? "unavailable" : "outside"
+        return CalendarStore.isCoachWorkingSlot(coachId, days[dayIndex], minute, CalendarStore.revision) ? "unavailable" : "outside"
     }
 
     function clearSelection() {
@@ -145,7 +145,7 @@ ColumnLayout {
         for (let w = 0; w < CalendarStore.bookingWeeks; ++w) {
             const monday = CalendarStore.addDays(firstWeek, 7 * w)
             const free = [0, 1, 2, 3, 4, 5, 6].findIndex(i =>
-                CalendarStore.bookableStarts(coachId, CalendarStore.addDays(monday, i), CalendarStore.slotMinutes).length > 0)
+                CalendarStore.bookableStarts(coachId, CalendarStore.addDays(monday, i), CalendarStore.slotMinutes, CalendarStore.revision).length > 0)
             if (free >= 0) {
                 weekStart = monday
                 if (w > 0 || selectedDay < free)
@@ -160,7 +160,7 @@ ColumnLayout {
 
     // A selection that stopped being free (e.g. someone else booked it) is dropped
     onFreeSlotCountChanged: {
-        if (hasSelection && !CalendarStore.isRangeFree(coachId, days[selDay], selFrom, selTo))
+        if (hasSelection && !CalendarStore.isRangeFree(coachId, days[selDay], selFrom, selTo, CalendarStore.revision))
             clearSelection()
     }
 

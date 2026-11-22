@@ -1,15 +1,19 @@
-// See session.h.
-#include "session.h"
+// See session.hpp.
+#include "session.hpp"
 
-#include "supabaseclient.h"
+#include "sessionstorage.hpp"
+#include "supabaseclient.hpp"
 
 #include <QJsonArray>
 #include <QRegularExpression>
+#include <QUrl>
 #include <QUrlQuery>
 
 Session::Session(QObject *parent)
     : QObject(parent)
     , m_client(SupabaseClient::instance())
+    // One saved login per backend project
+    , m_storage(new SessionStorage(QStringLiteral("supabase-session:") + QUrl(m_client->baseUrl()).host(), this))
 {
     connect(m_client, &SupabaseClient::sessionExpired, this, [this] {
         if (!loggedIn())
@@ -17,6 +21,11 @@ Session::Session(QObject *parent)
         setUser({});
         setLastError(tr("Your session has expired. Log in again."));
     });
+    // Every login and refresh brings a new refresh token; logging out clears it
+    connect(m_client, &SupabaseClient::refreshTokenChanged, this, [this] {
+        m_storage->save(m_client->refreshToken());
+    });
+    restore();
 }
 
 QString Session::firstName() const
@@ -80,6 +89,35 @@ bool Session::isValidEmail(const QString &email) const
     return pattern.match(email.trimmed()).hasMatch();
 }
 
+// Resumes the saved login, if there is one
+void Session::restore()
+{
+    if (!m_storage->isEnabled())
+        return;
+    setRestoring(true);
+    m_storage->read([this](const QString &token) {
+        if (token.isEmpty() || m_client->hasSession()) {
+            setRestoring(false);
+            return;
+        }
+        m_client->resumeSession(this, token, [this](const SupabaseClient::Reply &reply) {
+            if (reply.ok()) {
+                loadProfile();     // ends restoring
+                return;
+            }
+            if (reply.errorCode == QLatin1String("network")) {
+                // Keep it: the next launch tries again
+                setLastError(errorText(reply.errorCode));
+            } else {
+                // Revoked, expired or already used: forget it
+                m_storage->save({});
+                setLastError(tr("Your session has expired. Log in again."));
+            }
+            setRestoring(false);
+        });
+    });
+}
+
 // The profile row says who the user is (name, coach or client)
 void Session::loadProfile()
 {
@@ -92,10 +130,12 @@ void Session::loadProfile()
             m_client->signOut();
             fail(reply.ok() ? tr("This account has no profile. Please contact support.")
                             : errorText(reply.errorCode));
+            setRestoring(false);
             return;
         }
         setBusy(false);
         setUser(AuraUser::fromJson(rows.first().toObject()));
+        setRestoring(false);
     });
 }
 
@@ -146,4 +186,12 @@ void Session::setLastError(const QString &message)
         return;
     m_lastError = message;
     emit lastErrorChanged();
+}
+
+void Session::setRestoring(bool restoring)
+{
+    if (m_restoring == restoring)
+        return;
+    m_restoring = restoring;
+    emit restoringChanged();
 }

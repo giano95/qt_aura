@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls.Basic
 
 // App root. Picks what to show from the session state:
+//   resuming the saved login -> a splash (the logo)
 //   logged out -> AuthFlow (welcome / log in / sign up)
 //   coach      -> CoachHome
 //   client     -> ClientHome
@@ -35,7 +36,8 @@ ApplicationWindow {
     Loader {
         id: router
         anchors.fill: parent
-        sourceComponent: !Session.loggedIn ? authFlow
+        sourceComponent: Session.restoring ? splash
+                       : !Session.loggedIn ? authFlow
                        : Session.isCoach ? coachApp
                        : clientApp
         onLoaded: fadeIn.restart()
@@ -51,6 +53,20 @@ ApplicationWindow {
         easing.type: Easing.OutCubic
     }
 
+    Component {
+        id: splash
+        Item {
+            BrandMark {
+                anchors.centerIn: parent
+                size: 64
+                SequentialAnimation on opacity {
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 1; to: 0.4; duration: 700; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 0.4; to: 1; duration: 700; easing.type: Easing.InOutSine }
+                }
+            }
+        }
+    }
     Component {
         id: authFlow
         AuthFlow {}
@@ -70,6 +86,18 @@ ApplicationWindow {
     }
     Connections {
         target: ProgramStore
+        function onErrorOccurred(message) {
+            errorToast.show(message)
+        }
+    }
+    Connections {
+        target: ClientStore
+        function onErrorOccurred(message) {
+            errorToast.show(message)
+        }
+    }
+    Connections {
+        target: CoachStore
         function onErrorOccurred(message) {
             errorToast.show(message)
         }

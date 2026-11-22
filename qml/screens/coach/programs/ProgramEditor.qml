@@ -37,7 +37,7 @@ Item {
     readonly property int totalExercises: ProgramStore.exerciseCount(draft)
     readonly property int weekCount: ProgramStore.weekCount(draft, revision)
     readonly property var changedWeeks: ProgramStore.programChangedWeeks(draft, revision)
-    readonly property int clientCount: ClientStore.countForProgram(draft.id)
+    readonly property int clientCount: ClientStore.countForProgram(draft.id, ClientStore.revision)
 
     signal closeRequested()
     signal switchRequested(string programId, string backText)

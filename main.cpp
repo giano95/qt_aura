@@ -1,4 +1,5 @@
-#include "supabaseclient.h"
+#include "realtimeclient.hpp"
+#include "supabaseclient.hpp"
 
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -12,6 +13,8 @@ int main(int argc, char *argv[])
     // Backend connection, shared by the C++ stores. Declared before the engine
     // so it outlives the QML singletons that use it.
     SupabaseClient supabase(QStringLiteral(AURA_SUPABASE_URL), QStringLiteral(AURA_SUPABASE_KEY));
+    // Live updates while logged in: changes made elsewhere reach the stores
+    RealtimeClient realtime(&supabase);
 
     QQmlApplicationEngine engine;
     QObject::connect(

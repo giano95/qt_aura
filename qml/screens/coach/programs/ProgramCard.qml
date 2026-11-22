@@ -10,7 +10,7 @@ AbstractButton {
 
     readonly property int dayCount: program.days.length
     readonly property int exerciseCount: ProgramStore.exerciseCount(program)
-    readonly property int clientCount: ClientStore.countForProgram(program.id)
+    readonly property int clientCount: ClientStore.countForProgram(program.id, ClientStore.revision)
     readonly property int changedWeekCount: ProgramStore.programChangedWeeks(program).length
 
     hoverEnabled: true

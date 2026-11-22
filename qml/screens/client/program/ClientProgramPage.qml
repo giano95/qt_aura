@@ -10,7 +10,7 @@ import QtQuick.Controls.Basic
 ScrollView {
     id: page
 
-    readonly property var me: Session.loggedIn ? ClientStore.clientByEmail(Session.user.email) : null
+    readonly property var me: Session.loggedIn ? ClientStore.clientByEmail(Session.user.email, ClientStore.revision) : null
     readonly property var status: me ? ClientStore.programStatus(me) : ({ kind: "none", assignment: null })
     readonly property var assignment: status.assignment
     readonly property var program: assignment ? (ProgramStore.programs.find(p => p.id === assignment.programId) || null) : null

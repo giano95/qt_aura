@@ -266,6 +266,9 @@ MCP server in `.mcp.json` (log in with `/mcp`). Decisions taken with the user
 - **Stores (C++ singletons in `src/stores/`) own all data and rules. Screens
   only call them.** Keep it that way. Bindings calling store functions pass the
   store's `revision` (see "Backend").
+- `README.md` has two Mermaid diagrams (architecture, and how a change reaches
+  another device). Update them when you add a store, a backend class or a
+  connection between them.
 
 | Store | Responsibility |
 |---|---|

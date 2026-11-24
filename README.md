@@ -143,6 +143,92 @@ Changes show up at once and go to the server in order; the database enforces
 the same rules again (row-level security and SQL functions). All styling comes from `Theme`, and all controls use
 `QtQuick.Controls.Basic` with custom looks.
 
+### Architecture diagram
+
+Solid arrows are calls, dotted arrows are signals.
+
+```mermaid
+flowchart TB
+    subgraph screens["QML screens (qml/)"]
+        main["Main.qml<br/>window, router, splash"]
+        authFlow["AuthFlow<br/>welcome · login · signup"]
+        coachHome["CoachHome<br/>dashboard · clients · calendar · programs · exercises"]
+        clientHome["ClientHome<br/>home · my coach · calendar · my program"]
+        main --> authFlow & coachHome & clientHome
+    end
+
+    subgraph stores["C++ stores, QML singletons (src/stores)"]
+        session["Session<br/>login · signup · logout · restoring"]
+        programStore["ProgramStore<br/>programs · exercise library"]
+        clientStore["ClientStore<br/>clients · assignments"]
+        coachStore["CoachStore<br/>directory · requests · invitations"]
+        calendarStore["CalendarStore<br/>hours · blocked slots · sessions"]
+        storeBase["StoreBase<br/>loading · write queue · revision"]
+        programStore & clientStore & coachStore & calendarStore -->|"derive from"| storeBase
+        clientStore -->|"reads programs to assign"| programStore
+    end
+
+    models["Value types (src/models)<br/>auraUser · program · exercise · client · assignment<br/>coach · coaching · calendarSession"]
+
+    subgraph net["Backend client (src/supabase)"]
+        supabaseClient["SupabaseClient<br/>auth · tokens · tables · RPC<br/>notifyChanged"]
+        realtimeClient["RealtimeClient<br/>WebSocket · heartbeat · reconnect"]
+        sessionStorage["SessionStorage<br/>saved login · lock file"]
+    end
+
+    keychain[("System keychain<br/>macOS Keychain · Windows Credential Manager")]
+
+    subgraph supabase["Supabase (EU)"]
+        sbAuth["Auth"]
+        rest["PostgREST<br/>tables · RPC functions"]
+        db[("Postgres<br/>RLS · rule functions · triggers")]
+        realtime["Realtime<br/>private channel user:profile-id"]
+        rest --> db
+        db -->|"trigger realtime_on_change"| realtime
+    end
+
+    screens -->|"call functions, bind to properties"| stores
+    stores -->|"expose lists of"| models
+    session -->|"login · resume"| supabaseClient
+    session -->|"save · read refresh token"| sessionStorage
+    sessionStorage --> keychain
+    storeBase -->|"select · insert · update · rpc"| supabaseClient
+    supabaseClient -->|"HTTPS"| sbAuth & rest
+    realtime -->|"WebSocket: table changed"| realtimeClient
+    realtimeClient -->|"notifyChanged(table)"| supabaseClient
+    supabaseClient -.->|"dataChanged: reload"| storeBase
+    supabaseClient -.->|"sessionChanged"| storeBase & realtimeClient
+```
+
+### How a change reaches another device
+
+Here the coach confirms a booking and the client's app updates. No row data
+goes through Realtime: the notice only names the table, and the client reloads
+it through the API, so row-level security still decides what it can see.
+
+```mermaid
+sequenceDiagram
+    actor coach as Coach (device A)
+    participant storeA as CalendarStore (A)
+    participant api as PostgREST and Postgres
+    participant rt as Supabase Realtime
+    participant rc as RealtimeClient (B)
+    participant storeB as CalendarStore (B)
+    actor client as Client (device B)
+
+    coach->>storeA: confirmSession(id)
+    storeA->>storeA: update the local list, bump revision
+    storeA->>api: rpc respond_session (write queue)
+    api->>api: check rules, update row, trigger fires
+    api-->>rt: broadcast changed (table sessions) to user:client-id
+    rt-->>rc: WebSocket message
+    rc->>storeB: SupabaseClient notifyChanged(sessions)
+    Note over storeB: waits 300 ms to group notices
+    storeB->>api: reload (select, filtered by RLS)
+    api-->>storeB: rows
+    storeB-->>client: bump revision, bindings refresh
+```
+
 ---
 
 ## Roadmap

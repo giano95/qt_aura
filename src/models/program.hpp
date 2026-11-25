@@ -58,6 +58,8 @@ struct ProgramEntry
     Q_PROPERTY(QString rest MEMBER rest FINAL)
     Q_PROPERTY(QString notes MEMBER notes FINAL)
     Q_PROPERTY(QVariantMap weeks MEMBER weeks FINAL)
+    Q_PROPERTY(QString repsMode MEMBER repsMode FINAL)
+    Q_PROPERTY(QString loadMode MEMBER loadMode FINAL)
 
 public:
     QString uid;
@@ -68,9 +70,28 @@ public:
     QString rest;
     QString notes;
     QVariantMap weeks;
+    // How the editor shows `reps` and `load`. Editor-only: worked out from the
+    // stored text, never saved, so the database keeps the same plain text.
+    //   reps: "reps" (10, 8–10, 20+), "time" (45 s, 30–45 s), "other"
+    //   load: "load" (80 kg, 82.5 kg), "rpe" (RPE 8, RPE 7–8), "percent" (75%), "other"
+    QString repsMode;
+    QString loadMode;
 
     // Fields that can differ from week to week
     static const QStringList &weeklyKeys();
+
+    // ---- field modes ("other" = free text) ----
+    // Mode a stored text of field `key` fits ("" counts as the field's first mode)
+    static QString modeOf(const QString &key, const QString &stored);
+    // Stored text -> what the field shows in `mode`: the number part ("45 s" -> "45")
+    static QString modeInput(const QString &stored, const QString &mode);
+    // What the coach typed in `mode` -> stored text ("8-10" -> "8–10", "8" -> "RPE 8")
+    static QString modeStored(const QString &input, const QString &mode);
+    QString mode(const QString &key) const;
+    // The mode of the all-weeks value; "other" if a week's value doesn't fit it
+    QString detectMode(const QString &key) const;
+    // Switches field `key` to `mode`, converting the all-weeks and per-week values
+    void setMode(const QString &key, const QString &mode);
 
     QString field(const QString &key) const;
     void setField(const QString &key, const QString &value);

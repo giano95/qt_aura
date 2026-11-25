@@ -28,6 +28,7 @@ Rectangle {
     signal duplicateRequested()
     signal deleteRequested()
     signal entryFieldEdited(int entryIndex, string key, string value)
+    signal entryFieldModeRequested(int entryIndex, string key, string mode)
     signal entryMoveRequested(int entryIndex, int delta)
     signal entryRemoveRequested(int entryIndex)
     signal entryResetWeekRequested(int entryIndex)
@@ -120,6 +121,7 @@ Rectangle {
                 revision: card.revision
                 wide: card.wide
                 onFieldEdited: (key, value) => card.entryFieldEdited(index, key, value)
+                onFieldModeRequested: (key, mode) => card.entryFieldModeRequested(index, key, mode)
                 onMoveRequested: delta => card.entryMoveRequested(index, delta)
                 onRemoveRequested: card.entryRemoveRequested(index)
                 onResetWeekRequested: card.entryResetWeekRequested(index)

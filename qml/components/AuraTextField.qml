@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic
 
-// Labeled text field with an error message underneath and an optional
-// show/hide toggle for passwords.
+// Labeled text field with an error message underneath, an optional
+// show/hide toggle for passwords and an optional unit after the text
+// (`suffix`, e.g. "reps" or "s").
 ColumnLayout {
     id: root
 
@@ -15,6 +16,7 @@ ColumnLayout {
     property alias horizontalAlignment: input.horizontalAlignment
     property int fieldHeight: Theme.controlHeight
     property bool isPassword: false
+    property string suffix: ""           // unit shown inside the field, on the right
     property string errorText: ""
     property bool highlighted: false     // accent style, e.g. a value changed for one week
 
@@ -43,7 +45,9 @@ ColumnLayout {
         Layout.fillWidth: true
         implicitHeight: root.fieldHeight
         leftPadding: root.fieldHeight < Theme.controlHeight ? 10 : 14
-        rightPadding: root.isPassword ? revealToggle.width + 24 : leftPadding
+        rightPadding: root.isPassword ? revealToggle.width + 24
+                    : root.suffix.length > 0 ? suffixText.width + leftPadding + 6
+                    : leftPadding
         color: Theme.text
         placeholderTextColor: Theme.textMuted
         selectionColor: Theme.primary
@@ -62,6 +66,17 @@ ColumnLayout {
                         : input.activeFocus ? Theme.primary
                         : root.highlighted ? Theme.accent
                         : Theme.border
+        }
+
+        Text {
+            id: suffixText
+            visible: root.suffix.length > 0 && !root.isPassword
+            anchors.right: parent.right
+            anchors.rightMargin: input.leftPadding
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.suffix
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontBody
         }
 
         Text {

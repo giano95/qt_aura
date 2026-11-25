@@ -7,6 +7,12 @@ import QtQuick.Controls.Basic
 // Reads its entry live from `program` (the editor's draft) so in-place edits
 // don't rebuild the row. `week` 0 shows the all-weeks values; a week number
 // shows that week's values, with changed fields highlighted.
+//
+// Reps and Load have modes, picked from their label (EntryModeField):
+//   Reps: Reps (10, 8–10, 20+), Time in seconds (45, 30–45), Other
+//   Load: Load in kg (80, 82.5), RPE (8, 7–8), 1RM % (75), Other
+// Other is free text. Only the text is saved ("8–10", "45 s", "RPE 8",
+// "75%", "Max"); the modes are worked out from it on load.
 Rectangle {
     id: row
 
@@ -27,8 +33,32 @@ Rectangle {
     readonly property var exercise: ProgramStore.exerciseById(entry.exerciseId, ProgramStore.revision)
     readonly property var changedKeys: ProgramStore.changedKeys(entry, week, revision)
     readonly property var changedWeeks: ProgramStore.entryChangedWeeks(entry, revision)
+    // Changing a mode replaces the draft, so these need no revision
+    readonly property string repsMode: entry.repsMode ? entry.repsMode : "reps"
+    readonly property string loadMode: entry.loadMode ? entry.loadMode : "load"
+
+    // Typing limits per mode: a number or a range (typed with -, saved with –)
+    readonly property var repsModes: [
+        { mode: "reps", label: qsTr("Reps"), suffix: qsTr("reps"), placeholder: "10",
+          pattern: /^\d{0,3}([-–]\d{0,3}|\+)?$/ },
+        { mode: "time", label: qsTr("Time"), suffix: qsTr("s"), placeholder: "45",
+          pattern: /^\d{0,4}([-–]\d{0,4})?$/ },
+        { mode: "other", label: qsTr("Other"), suffix: "", placeholder: qsTr("Max, 250 m…"),
+          pattern: null }
+    ]
+    readonly property var loadModes: [
+        { mode: "load", label: qsTr("Load"), suffix: qsTr("kg"), placeholder: "80",
+          pattern: /^\d{0,3}([.,]\d{0,2})?([-–]\d{0,3}([.,]\d{0,2})?)?$/ },
+        { mode: "rpe", label: qsTr("RPE"), suffix: qsTr("RPE"), placeholder: "8",
+          pattern: /^((10|[1-9])([.,]5?)?)?([-–]((10|[1-9])([.,]5?)?)?)?$/ },
+        { mode: "percent", label: qsTr("1RM %"), suffix: "%", placeholder: "75",
+          pattern: /^\d{0,3}([-–]\d{0,3})?$/ },
+        { mode: "other", label: qsTr("Other"), suffix: "", placeholder: qsTr("Bodyweight, band…"),
+          pattern: null }
+    ]
 
     signal fieldEdited(string key, string value)
+    signal fieldModeRequested(string key, string mode)
     signal moveRequested(int delta)
     signal removeRequested()
     signal resetWeekRequested()
@@ -127,27 +157,29 @@ Rectangle {
                 Layout.fillWidth: false
                 onTextEdited: row.fieldEdited("sets", setsField.text)
             }
-            AuraTextField {
-                id: repsField
-                label: qsTr("Reps / time")
-                text: row.value("reps")
+            // Modes cover every week, so they can only be changed in the
+            // all-weeks view
+            EntryModeField {
+                modes: row.repsModes
+                mode: row.repsMode
+                storedText: row.value("reps")
                 highlighted: row.changedKeys.includes("reps")
-                placeholderText: "10"
-                fieldHeight: 36
+                modeEditable: row.week === 0
                 Layout.preferredWidth: 112
                 Layout.fillWidth: false
-                onTextEdited: row.fieldEdited("reps", repsField.text)
+                onEdited: stored => row.fieldEdited("reps", stored)
+                onModeRequested: mode => row.fieldModeRequested("reps", mode)
             }
-            AuraTextField {
-                id: loadField
-                label: qsTr("Load")
-                text: row.value("load")
+            EntryModeField {
+                modes: row.loadModes
+                mode: row.loadMode
+                storedText: row.value("load")
                 highlighted: row.changedKeys.includes("load")
-                placeholderText: qsTr("kg, %, RPE")
-                fieldHeight: 36
+                modeEditable: row.week === 0
                 Layout.preferredWidth: row.wide ? 150 : -1
                 Layout.fillWidth: !row.wide
-                onTextEdited: row.fieldEdited("load", loadField.text)
+                onEdited: stored => row.fieldEdited("load", stored)
+                onModeRequested: mode => row.fieldModeRequested("load", mode)
             }
             AuraTextField {
                 id: restField

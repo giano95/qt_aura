@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Controls.Basic
 
 // Styled popup menu. Add Action children; set objectName: "destructive" on an
-// Action to show it in red.
+// Action to show it in red, and `checked` to mark the current choice with ✓
+// (leave `checkable` off, so the binding stays).
 Menu {
     id: menu
 
@@ -39,6 +40,17 @@ Menu {
             color: item.highlighted && item.enabled
                    ? (item.destructive ? Theme.dangerSoft : Theme.surfaceAlt)
                    : "transparent"
+
+            Text {
+                visible: item.checked
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                text: "✓"
+                color: Theme.primary
+                font.pixelSize: Theme.fontBody
+                font.weight: Font.DemiBold
+            }
         }
     }
 }

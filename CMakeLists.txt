@@ -129,6 +129,7 @@ qt_add_qml_module(appqt_aura
         qml/screens/coach/clients/ProfileVisibilityDialog.qml
         qml/screens/coach/clients/InviteClientDialog.qml
         qml/screens/coach/programs/DayCard.qml
+        qml/screens/coach/programs/EntryModeField.qml
         qml/screens/coach/programs/ExerciseCard.qml
         qml/screens/coach/programs/ExerciseFormDialog.qml
         qml/screens/coach/programs/ExerciseLibrary.qml

@@ -90,6 +90,16 @@ public:
     // Changes a draft entry (JS object) in place. Setting the all-weeks value removes the change.
     Q_INVOKABLE void setWeekValue(QJSValue entry, int week, const QString &key, const QString &value) const;
 
+    // ---- field modes (editor only; the database keeps storing the text) ----
+    // Modes: reps "reps" / "time" / "other"; load "load" / "rpe" / "percent" / "other"
+    // Stored text -> what the field shows in `mode` (the number part)
+    Q_INVOKABLE QString modeInput(const QString &stored, const QString &mode) const;
+    // What the coach typed in `mode` -> stored text
+    Q_INVOKABLE QString modeStored(const QString &input, const QString &mode) const;
+    // Switches field `key` ("reps" or "load") of a draft entry (JS object) to
+    // `mode`, converting its all-weeks and per-week values
+    Q_INVOKABLE void setFieldMode(QJSValue entry, const QString &key, const QString &mode) const;
+
     // ---- display helpers ------------------------------------------------------
     Q_INVOKABLE int programWeekFor(const QVariant &program, int assignmentWeek) const;
     // "4 × 6–8", or just "30 min" for a single set

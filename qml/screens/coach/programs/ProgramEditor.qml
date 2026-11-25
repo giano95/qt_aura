@@ -86,6 +86,15 @@ Item {
         touch()
     }
 
+    // Mode of one exercise's reps (reps / time / other) or load (load / rpe /
+    // percent / other), in every week. Replaces the draft (values are
+    // converted), so the rows rebuild.
+    function setFieldMode(dayIndex, entryIndex, key, mode) {
+        if (draft.days[dayIndex].exercises[entryIndex][key + "Mode"] === mode)
+            return
+        update(d => ProgramStore.setFieldMode(d.days[dayIndex].exercises[entryIndex], key, mode))
+    }
+
     function resetWeek(dayIndex, entryIndex) {
         const w = week
         update(d => {
@@ -367,7 +376,7 @@ Item {
                         tone: "info"
                         visible: editor.week > 0
                         Layout.fillWidth: true
-                        text: qsTr("Editing <b>week %1</b>. Sets, reps and load you change here apply to this week only and are highlighted. Rest, notes and the list of exercises are the same every week.").arg(editor.week)
+                        text: qsTr("Editing <b>week %1</b>. Sets, reps and load you change here apply to this week only and are highlighted. Rest, notes, the kind of reps and load (reps or time, kg or RPE…) and the list of exercises are the same every week.").arg(editor.week)
                     }
                 }
 
@@ -388,6 +397,7 @@ Item {
                         onDuplicateRequested: editor.duplicateDay(index)
                         onDeleteRequested: editor.requestDeleteDay(index)
                         onEntryFieldEdited: (entryIndex, key, value) => editor.setEntryField(index, entryIndex, key, value)
+                        onEntryFieldModeRequested: (entryIndex, key, mode) => editor.setFieldMode(index, entryIndex, key, mode)
                         onEntryMoveRequested: (entryIndex, delta) => editor.moveExercise(index, entryIndex, delta)
                         onEntryRemoveRequested: entryIndex => editor.removeExercise(index, entryIndex)
                         onEntryResetWeekRequested: entryIndex => editor.resetWeek(index, entryIndex)

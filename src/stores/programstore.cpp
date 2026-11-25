@@ -385,6 +385,30 @@ void ProgramStore::setWeekValue(QJSValue entry, int week, const QString &key, co
     entry.setProperty(QStringLiteral("weeks"), engine->toScriptValue(QJsonObject::fromVariantMap(typed.weeks)));
 }
 
+// ---- field modes ----------------------------------------------------------------
+
+QString ProgramStore::modeInput(const QString &stored, const QString &mode) const
+{
+    return ProgramEntry::modeInput(stored, mode);
+}
+
+QString ProgramStore::modeStored(const QString &input, const QString &mode) const
+{
+    return ProgramEntry::modeStored(input, mode);
+}
+
+void ProgramStore::setFieldMode(QJSValue entry, const QString &key, const QString &mode) const
+{
+    ProgramEntry typed = ProgramEntry::fromVariant(entry.toVariant());
+    typed.setMode(key, mode);
+    QJSEngine *engine = qjsEngine(this);
+    if (!engine)
+        return;
+    entry.setProperty(key, typed.field(key));
+    entry.setProperty(QStringLiteral("weeks"), engine->toScriptValue(QJsonObject::fromVariantMap(typed.weeks)));
+    entry.setProperty(key + QStringLiteral("Mode"), typed.mode(key));
+}
+
 // ---- display helpers ------------------------------------------------------------
 
 int ProgramStore::programWeekFor(const QVariant &program, int assignmentWeek) const

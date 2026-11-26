@@ -11,9 +11,11 @@ AuraDialog {
     property string exerciseId: ""
     // Built-in library exercises are read-only
     property bool builtIn: false
-    property string muscle: ""
+    property var muscles: []                // groups worked
+    property var subMuscles: []             // parts of them; none = the whole group
     property string equipment: ""
-    property string presetMuscle: ""        // preselected group for new exercises
+    property string presetMuscle: ""        // preselected group and part for new exercises
+    property string presetSubMuscle: ""
     property bool submitted: false
 
     readonly property bool isNew: exerciseId === ""
@@ -28,7 +30,7 @@ AuraDialog {
             return qsTr("An exercise with this name already exists.")
         return ""
     }
-    readonly property string muscleError: submitted && muscle === "" ? qsTr("Choose a muscle group.") : ""
+    readonly property string muscleError: submitted && muscles.length === 0 ? qsTr("Choose at least one muscle group.") : ""
     readonly property string equipmentError: submitted && equipment === "" ? qsTr("Choose the equipment.") : ""
 
     signal saved(string exerciseId)
@@ -37,7 +39,8 @@ AuraDialog {
         exerciseId = ""
         builtIn = false
         nameField.text = name || ""
-        muscle = presetMuscle
+        muscles = presetMuscle !== "" ? [presetMuscle] : []
+        subMuscles = presetSubMuscle !== "" ? [presetSubMuscle] : []
         equipment = ""
         instructionsField.text = ""
         videoField.text = ""
@@ -52,7 +55,8 @@ AuraDialog {
         exerciseId = id
         builtIn = e.builtIn
         nameField.text = e.name
-        muscle = e.muscle
+        muscles = Array.from(e.muscles)
+        subMuscles = Array.from(e.subMuscles)
         equipment = e.equipment
         instructionsField.text = e.instructions
         videoField.text = e.videoUrl
@@ -67,7 +71,8 @@ AuraDialog {
         const id = ProgramStore.saveExercise({
             id: exerciseId,
             name: nameField.text,
-            muscle: muscle,
+            muscles: muscles,
+            subMuscles: subMuscles,
             equipment: equipment,
             instructions: instructionsField.text,
             videoUrl: videoField.text
@@ -112,21 +117,51 @@ AuraDialog {
         Layout.fillWidth: true
 
         Label {
-            text: qsTr("Muscle group")
+            text: qsTr("Muscle groups")
             font.pixelSize: Theme.fontSmall
             font.weight: Font.DemiBold
         }
-        Flow {
-            spacing: 8
+        MusclePicker {
+            visible: !dialog.builtIn
+            muscles: dialog.muscles
+            subMuscles: dialog.subMuscles
             Layout.fillWidth: true
-            Repeater {
-                model: ProgramStore.muscleGroups
-                FilterChip {
-                    required property string modelData
-                    text: modelData
-                    selected: dialog.muscle === modelData
-                    enabled: !dialog.builtIn
-                    onClicked: dialog.muscle = modelData
+            onChosen: (groups, parts) => {
+                dialog.muscles = groups
+                dialog.subMuscles = parts
+            }
+        }
+        // Built-in exercises only show what's chosen, a line per group:
+        // group › its parts
+        Repeater {
+            model: dialog.builtIn ? dialog.muscles : []
+
+            Flow {
+                id: groupLine
+                required property string modelData
+                readonly property var parts: ProgramStore.subMuscles(modelData)
+                                                 .filter(p => dialog.subMuscles.includes(p))
+                spacing: 6
+                Layout.fillWidth: true
+
+                Chip {
+                    text: groupLine.modelData
+                    tone: "primary"
+                }
+                Label {
+                    visible: groupLine.parts.length > 0
+                    text: "›"
+                    color: Theme.textMuted
+                    height: 24
+                    verticalAlignment: Text.AlignVCenter
+                }
+                Repeater {
+                    model: groupLine.parts
+                    Chip {
+                        required property string modelData
+                        text: modelData
+                        tone: "primary"
+                    }
                 }
             }
         }
@@ -148,6 +183,7 @@ AuraDialog {
             font.weight: Font.DemiBold
         }
         Flow {
+            visible: !dialog.builtIn
             spacing: 8
             Layout.fillWidth: true
             Repeater {
@@ -156,10 +192,13 @@ AuraDialog {
                     required property string modelData
                     text: modelData
                     selected: dialog.equipment === modelData
-                    enabled: !dialog.builtIn
                     onClicked: dialog.equipment = modelData
                 }
             }
+        }
+        Chip {
+            visible: dialog.builtIn
+            text: dialog.equipment
         }
         Label {
             visible: text.length > 0

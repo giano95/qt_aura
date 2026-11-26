@@ -18,7 +18,6 @@ ColumnLayout {
     property bool isPassword: false
     property string suffix: ""           // unit shown inside the field, on the right
     property string errorText: ""
-    property bool highlighted: false     // accent style, e.g. a value changed for one week
 
     signal accepted()
     signal textEdited()
@@ -60,11 +59,10 @@ ColumnLayout {
 
         background: Rectangle {
             radius: Theme.radius
-            color: root.highlighted ? Theme.accentSoft : Theme.surface
-            border.width: input.activeFocus || root.highlighted ? 2 : 1
+            color: Theme.surface
+            border.width: input.activeFocus ? 2 : 1
             border.color: root.errorText.length > 0 ? Theme.danger
                         : input.activeFocus ? Theme.primary
-                        : root.highlighted ? Theme.accent
                         : Theme.border
         }
 

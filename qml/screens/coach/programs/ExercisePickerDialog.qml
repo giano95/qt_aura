@@ -11,10 +11,11 @@ AuraDialog {
 
     property string dayName: ""
     property string muscle: ""
+    property string subMuscle: ""
     property var addedCounts: ({})       // exerciseId -> times added while open
     property int addedTotal: 0
 
-    readonly property var results: ProgramStore.searchExercises(search.text, muscle, ProgramStore.revision)
+    readonly property var results: ProgramStore.searchExercises(search.text, muscle, subMuscle, ProgramStore.revision)
 
     signal picked(string exerciseId)
     signal createRequested(string name)
@@ -22,6 +23,7 @@ AuraDialog {
     function openFor(name) {
         dayName = name
         muscle = ""
+        subMuscle = ""
         addedCounts = ({})
         addedTotal = 0
         search.text = ""
@@ -54,23 +56,13 @@ AuraDialog {
         Layout.fillWidth: true
     }
 
-    Flow {
+    MuscleFilter {
         Layout.fillWidth: true
-        spacing: 6
-
-        FilterChip {
-            text: qsTr("All")
-            selected: dialog.muscle === ""
-            onClicked: dialog.muscle = ""
-        }
-        Repeater {
-            model: ProgramStore.muscleGroups
-            FilterChip {
-                required property string modelData
-                text: modelData
-                selected: dialog.muscle === modelData
-                onClicked: dialog.muscle = modelData
-            }
+        muscle: dialog.muscle
+        subMuscle: dialog.subMuscle
+        onPicked: (group, part) => {
+            dialog.muscle = group
+            dialog.subMuscle = part
         }
     }
 
@@ -113,7 +105,7 @@ AuraDialog {
                         Layout.fillWidth: true
                     }
                     Label {
-                        text: row.modelData.muscle + " · " + row.modelData.equipment
+                        text: row.modelData.muscleLabel + " · " + row.modelData.equipment
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSmall
                         elide: Text.ElideRight

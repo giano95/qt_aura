@@ -18,6 +18,13 @@ bool containsText(const QString &haystack, const QString &needle)
     return haystack.contains(needle, Qt::CaseInsensitive);
 }
 
+// muscle "" matches every group; subMuscle "" any part of it
+bool matchesMuscle(const Exercise &e, const QString &muscle, const QString &subMuscle)
+{
+    return (muscle.isEmpty() || e.muscles.contains(muscle))
+           && (subMuscle.isEmpty() || e.subMuscles.contains(subMuscle));
+}
+
 } // namespace
 
 ProgramStore::ProgramStore(QObject *parent)
@@ -31,11 +38,15 @@ ProgramStore::ProgramStore(QObject *parent)
 
 QStringList ProgramStore::muscleGroups() const
 {
-    static const QStringList groups{
-        QStringLiteral("Chest"), QStringLiteral("Back"), QStringLiteral("Legs"),
-        QStringLiteral("Glutes"), QStringLiteral("Shoulders"), QStringLiteral("Arms"),
-        QStringLiteral("Core"), QStringLiteral("Full body"), QStringLiteral("Cardio")};
+    QStringList groups;
+    for (const auto &[group, parts] : Exercise::muscleTree())
+        groups.append(group);
     return groups;
+}
+
+QStringList ProgramStore::subMuscles(const QString &muscle) const
+{
+    return Exercise::partsOf(muscle);
 }
 
 QStringList ProgramStore::equipmentTypes() const
@@ -55,7 +66,7 @@ void ProgramStore::load()
 
     QUrlQuery exerciseQuery;
     exerciseQuery.addQueryItem(QStringLiteral("select"),
-                               QStringLiteral("id,coach_id,name,muscle,equipment,instructions,video_url"));
+                               QStringLiteral("id,coach_id,name,muscles,sub_muscles,equipment,instructions,video_url,image"));
     exerciseQuery.addQueryItem(QStringLiteral("order"), QStringLiteral("name.asc"));
     m_client->select(this, QStringLiteral("exercises"), exerciseQuery,
                      [this, generation](const SupabaseClient::Reply &reply) {
@@ -128,12 +139,13 @@ QVariant ProgramStore::exerciseById(const QString &id, const QVariant &) const
     return QVariant::fromValue(nullptr);
 }
 
-QList<Exercise> ProgramStore::searchExercises(const QString &query, const QString &muscle, const QVariant &) const
+QList<Exercise> ProgramStore::searchExercises(const QString &query, const QString &muscle,
+                                              const QString &subMuscle, const QVariant &) const
 {
     const QString q = query.trimmed();
     QList<Exercise> result;
     for (const Exercise &e : m_exercises) {
-        if (!muscle.isEmpty() && e.muscle != muscle)
+        if (!matchesMuscle(e, muscle, subMuscle))
             continue;
         if (!q.isEmpty() && !containsText(e.name, q) && !containsText(e.equipment, q))
             continue;
@@ -145,12 +157,10 @@ QList<Exercise> ProgramStore::searchExercises(const QString &query, const QStrin
     return result;
 }
 
-int ProgramStore::countByMuscle(const QString &muscle, const QVariant &) const
+int ProgramStore::countByMuscle(const QString &muscle, const QString &subMuscle, const QVariant &) const
 {
-    if (muscle.isEmpty())
-        return m_exercises.size();
     return int(std::count_if(m_exercises.cbegin(), m_exercises.cend(),
-                             [&](const Exercise &e) { return e.muscle == muscle; }));
+                             [&](const Exercise &e) { return matchesMuscle(e, muscle, subMuscle); }));
 }
 
 bool ProgramStore::isExerciseNameTaken(const QString &name, const QString &exceptId, const QVariant &) const
@@ -181,9 +191,16 @@ QString ProgramStore::saveExercise(const QVariantMap &input)
             emit errorOccurred(tr("Built-in exercises can't be changed."));
             return exercise.id;
         }
+        exercise.image = existing->image;   // not editable in the app yet
     }
     exercise.name = input.value(QStringLiteral("name")).toString().trimmed();
-    exercise.muscle = input.value(QStringLiteral("muscle")).toString();
+    exercise.muscles = input.value(QStringLiteral("muscles")).toStringList();
+    exercise.subMuscles = input.value(QStringLiteral("subMuscles")).toStringList();
+    exercise.normalizeMuscles();
+    if (exercise.muscles.isEmpty()) {
+        emit errorOccurred(tr("Choose at least one muscle group."));
+        return isNew ? QString() : exercise.id;
+    }
     exercise.equipment = input.value(QStringLiteral("equipment")).toString();
     exercise.instructions = input.value(QStringLiteral("instructions")).toString().trimmed();
     exercise.videoUrl = input.value(QStringLiteral("videoUrl")).toString().trimmed();
@@ -193,7 +210,8 @@ QString ProgramStore::saveExercise(const QVariantMap &input)
     changed();
 
     QJsonObject row{{QStringLiteral("name"), exercise.name},
-                    {QStringLiteral("muscle"), exercise.muscle},
+                    {QStringLiteral("muscles"), QJsonArray::fromStringList(exercise.muscles)},
+                    {QStringLiteral("sub_muscles"), QJsonArray::fromStringList(exercise.subMuscles)},
                     {QStringLiteral("equipment"), exercise.equipment},
                     {QStringLiteral("instructions"), exercise.instructions},
                     {QStringLiteral("video_url"), exercise.videoUrl}};
@@ -360,16 +378,6 @@ QString ProgramStore::effective(const QVariant &entry, int week, const QString &
 QStringList ProgramStore::changedKeys(const QVariant &entry, int week, const QVariant &) const
 {
     return ProgramEntry::fromVariant(entry).changedKeys(week);
-}
-
-QList<int> ProgramStore::entryChangedWeeks(const QVariant &entry, const QVariant &) const
-{
-    return ProgramEntry::fromVariant(entry).changedWeeks();
-}
-
-QList<int> ProgramStore::programChangedWeeks(const QVariant &program, const QVariant &) const
-{
-    return Program::fromVariant(program).changedWeeks();
 }
 
 void ProgramStore::setWeekValue(QJSValue entry, int week, const QString &key, const QString &value) const

@@ -123,6 +123,9 @@ src/                    C++ (Phase 2)
                           invitations, visibility), CalendarStore (hours, blocked
                           slots, sessions, bookings); StoreBase (what they share)
 supabase/               Database: migrations/ (schema, rules, RLS) and seed.sql (demo data)
+assets/exercises/       Exercise drawings the app ships, light/ and dark/ (one per theme)
+third_party/            open-exercise-art/: all 562 drawings (SVG) and their license
+tools/                  exercise_images.py: makes assets/exercises/ PNGs from a drawing id
 qml/
   theme/Theme.qml       Design tokens (colors, radii, font sizes), light/dark
   services/MockData.qml  leftover sample content for the dashboards
@@ -256,3 +259,10 @@ coachings (requests, invitations, active and past coach–client links) ·
 assignments · programs · program_days · program_entries (with per-week
 changes) · exercises (built-in + each coach's own) · working_hours ·
 blocked_slots · sessions (status, who cancelled). See `supabase/migrations/`.
+
+## Credits
+
+Exercise illustrations: [Open Exercise Art](https://github.com/AlexMollard/Open-Exercise-Art)
+/ Alex Mollard, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+(colors changed). The recolored copies in `assets/exercises/` stay under the
+same license; see `third_party/open-exercise-art/`.

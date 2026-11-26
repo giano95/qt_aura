@@ -6,7 +6,7 @@ import QtQuick.Controls.Basic
 //
 // Reads its entry live from `program` (the editor's draft) so in-place edits
 // don't rebuild the row. `week` 0 shows the all-weeks values; a week number
-// shows that week's values, with changed fields highlighted.
+// shows that week's values; changes there apply to that week only.
 //
 // Reps and Load have modes, picked from their label (EntryModeField):
 //   Reps: Reps (10, 8–10, 20+), Time in seconds (45, 30–45), Other
@@ -32,7 +32,6 @@ Rectangle {
     }
     readonly property var exercise: ProgramStore.exerciseById(entry.exerciseId, ProgramStore.revision)
     readonly property var changedKeys: ProgramStore.changedKeys(entry, week, revision)
-    readonly property var changedWeeks: ProgramStore.entryChangedWeeks(entry, revision)
     // Changing a mode replaces the draft, so these need no revision
     readonly property string repsMode: entry.repsMode ? entry.repsMode : "reps"
     readonly property string loadMode: entry.loadMode ? entry.loadMode : "load"
@@ -92,6 +91,23 @@ Rectangle {
                 horizontalAlignment: Text.AlignHCenter
                 Layout.preferredWidth: 20
             }
+            // Small drawing of the exercise, if it has one
+            Rectangle {
+                visible: row.exercise !== null && row.exercise.image.length > 0
+                radius: Theme.radius
+                color: Theme.surfaceAlt
+                Layout.preferredWidth: row.wide ? 64 : 48
+                Layout.preferredHeight: row.wide ? 64 : 48
+
+                ExerciseImage {
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    drawing: row.exercise ? row.exercise.image : ""
+                    // Decoded small: lines stay clean, and it saves memory
+                    sourceSize.width: 2 * width
+                    sourceSize.height: 2 * height
+                }
+            }
             ColumnLayout {
                 spacing: 0
                 Layout.fillWidth: true
@@ -104,19 +120,12 @@ Rectangle {
                 }
                 Label {
                     visible: row.exercise !== null
-                    text: row.exercise ? row.exercise.muscle + " · " + row.exercise.equipment : ""
+                    text: row.exercise ? row.exercise.muscleLabel + " · " + row.exercise.equipment : ""
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontSmall
                     elide: Text.ElideRight
                     Layout.fillWidth: true
                 }
-            }
-            Chip {
-                visible: row.week === 0 && row.changedWeeks.length > 0 && row.wide
-                tone: "accent"
-                text: row.changedWeeks.length === 1
-                      ? qsTr("Changes in week %1").arg(row.changedWeeks[0])
-                      : qsTr("Changes in weeks %1").arg(row.changedWeeks.join(", "))
             }
             IconButton {
                 glyph: "↑"
@@ -149,7 +158,6 @@ Rectangle {
                 id: setsField
                 label: qsTr("Sets")
                 text: row.value("sets")
-                highlighted: row.changedKeys.includes("sets")
                 fieldHeight: 36
                 validator: IntValidator { bottom: 1; top: 99 }
                 inputMethodHints: Qt.ImhDigitsOnly
@@ -163,7 +171,6 @@ Rectangle {
                 modes: row.repsModes
                 mode: row.repsMode
                 storedText: row.value("reps")
-                highlighted: row.changedKeys.includes("reps")
                 modeEditable: row.week === 0
                 Layout.preferredWidth: 112
                 Layout.fillWidth: false
@@ -174,7 +181,6 @@ Rectangle {
                 modes: row.loadModes
                 mode: row.loadMode
                 storedText: row.value("load")
-                highlighted: row.changedKeys.includes("load")
                 modeEditable: row.week === 0
                 Layout.preferredWidth: row.wide ? 150 : -1
                 Layout.fillWidth: !row.wide
@@ -206,32 +212,17 @@ Rectangle {
             }
         }
 
-        RowLayout {
+        // This week has its own values: offer to go back to the all-weeks ones
+        AuraButton {
             visible: row.week > 0 && row.changedKeys.length > 0
             Layout.leftMargin: row.wide ? 30 : 0
-            spacing: 8
-
-            Rectangle {
-                implicitWidth: 8
-                implicitHeight: 8
-                radius: 4
-                color: Theme.accent
-            }
-            Label {
-                text: qsTr("Different in week %1").arg(row.week)
-                color: Theme.accent
-                font.pixelSize: Theme.fontSmall
-                font.weight: Font.DemiBold
-            }
-            AuraButton {
-                variant: "ghost"
-                text: qsTr("Use the all-weeks values")
-                implicitHeight: 28
-                leftPadding: 8
-                rightPadding: 8
-                font.pixelSize: Theme.fontSmall
-                onClicked: row.resetWeekRequested()
-            }
+            variant: "ghost"
+            text: qsTr("Use the all-weeks values")
+            implicitHeight: 28
+            leftPadding: 8
+            rightPadding: 8
+            font.pixelSize: Theme.fontSmall
+            onClicked: row.resetWeekRequested()
         }
     }
 }

@@ -36,7 +36,6 @@ Item {
     readonly property bool wide: width >= 760
     readonly property int totalExercises: ProgramStore.exerciseCount(draft)
     readonly property int weekCount: ProgramStore.weekCount(draft, revision)
-    readonly property var changedWeeks: ProgramStore.programChangedWeeks(draft, revision)
     readonly property int clientCount: ClientStore.countForProgram(draft.id, ClientStore.revision)
 
     signal closeRequested()
@@ -366,7 +365,6 @@ Item {
                                 required property int index
                                 text: qsTr("Week %1").arg(index + 1)
                                 selected: editor.week === index + 1
-                                marked: editor.changedWeeks.includes(index + 1)
                                 onClicked: editor.week = index + 1
                             }
                         }
@@ -376,7 +374,7 @@ Item {
                         tone: "info"
                         visible: editor.week > 0
                         Layout.fillWidth: true
-                        text: qsTr("Editing <b>week %1</b>. Sets, reps and load you change here apply to this week only and are highlighted. Rest, notes, the kind of reps and load (reps or time, kg or RPE…) and the list of exercises are the same every week.").arg(editor.week)
+                        text: qsTr("Editing <b>week %1</b>. Sets, reps and load you change here apply to this week only. Rest, notes, the kind of reps and load (reps or time, kg or RPE…) and the list of exercises are the same every week.").arg(editor.week)
                     }
                 }
 
@@ -449,6 +447,7 @@ Item {
     ExerciseFormDialog {
         id: exerciseForm
         presetMuscle: picker.muscle
+        presetSubMuscle: picker.subMuscle
         onSaved: exerciseId => {
             // Created from the picker: add it to the day right away
             if (picker.opened) {

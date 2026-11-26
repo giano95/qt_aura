@@ -1,5 +1,6 @@
 // Programs and exercises, as QML sees them (value types):
-//   exercise:  { id, name, muscle, equipment, instructions, videoUrl, builtIn }
+//   exercise:  { id, name, muscles, subMuscles, muscleTags, muscleLabel,
+//                equipment, instructions, videoUrl, image, builtIn }
 //   program:   { id, name, description, weeks, updatedAt (ms), days: [ programDay ] }
 //   programDay:   { id, name, exercises: [ programEntry ] }
 //   programEntry: { uid, exerciseId, sets, reps, load, rest, notes, weeks }
@@ -18,6 +19,8 @@
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
+#include <utility>
+
 struct Exercise
 {
     Q_GADGET
@@ -25,22 +28,42 @@ struct Exercise
 
     Q_PROPERTY(QString id MEMBER id FINAL)
     Q_PROPERTY(QString name MEMBER name FINAL)
-    Q_PROPERTY(QString muscle MEMBER muscle FINAL)
+    // Muscle groups worked, and parts of them (see muscleTree()). A group
+    // with none of its parts listed means the whole group.
+    Q_PROPERTY(QStringList muscles MEMBER muscles FINAL)
+    Q_PROPERTY(QStringList subMuscles MEMBER subMuscles FINAL)
+    // Each group's parts, or the group itself: ["Middle Chest", "Triceps", "Cardio"]
+    Q_PROPERTY(QStringList muscleTags READ muscleTags FINAL)
+    // muscleTags joined: "Middle Chest, Triceps"
+    Q_PROPERTY(QString muscleLabel READ muscleLabel FINAL)
     Q_PROPERTY(QString equipment MEMBER equipment FINAL)
     Q_PROPERTY(QString instructions MEMBER instructions FINAL)
     Q_PROPERTY(QString videoUrl MEMBER videoUrl FINAL)
+    // Drawing id (assets/exercises/{light,dark}/<image>.png); "" = none
+    Q_PROPERTY(QString image MEMBER image FINAL)
     // From the built-in library: read-only, shared by every coach
     Q_PROPERTY(bool builtIn MEMBER builtIn FINAL)
 
 public:
     QString id;
     QString name;
-    QString muscle;
+    QStringList muscles;
+    QStringList subMuscles;
     QString equipment;
     QString instructions;
     QString videoUrl;
+    QString image;
     bool builtIn = false;
 
+    // Muscle groups and their parts, in display order. Stored values: renaming
+    // one needs a migration of public.exercises (muscles / sub_muscles).
+    static const QList<std::pair<QString, QStringList>> &muscleTree();
+    static QStringList partsOf(const QString &group);
+    // Keeps known groups, and parts whose group is listed, both in tree order
+    void normalizeMuscles();
+
+    QStringList muscleTags() const;
+    QString muscleLabel() const { return muscleTags().join(QStringLiteral(", ")); }
     static Exercise fromJson(const QJsonObject &row);
     friend bool operator==(const Exercise &, const Exercise &) = default;
 };
@@ -99,8 +122,6 @@ public:
     QString effective(int week, const QString &key) const;
     // Keys changed in `week`
     QStringList changedKeys(int week) const;
-    // Weeks in which this entry differs from its all-weeks values, ascending
-    QList<int> changedWeeks() const;
     // Setting the all-weeks value removes that week's change
     void setWeekValue(int week, const QString &key, const QString &value);
     // Drops changes for weeks after `weekCount`
@@ -159,8 +180,6 @@ public:
     static int clampWeeks(const QVariant &weeks);
 
     int exerciseCount() const;
-    // Weeks in which anything differs, ascending
-    QList<int> changedWeeks() const;
     // Program week shown for an assignment week: past the end, the last week repeats
     int programWeekFor(int assignmentWeek) const;
     // Usage of an exercise anywhere in the program

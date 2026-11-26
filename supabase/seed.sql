@@ -182,7 +182,7 @@ begin
 
     insert into public.program_days (program_id, position, name) values (p_fatloss, 0, 'Day 1 · Circuit A') returning id into d;
     perform pg_temp.entry(d, 0, 'Kettlebell swing', '4', '15', '30', '16 kg');
-    perform pg_temp.entry(d, 1, 'Dumbbell thruster', '4', '10', '30', '2 × 8 kg');
+    perform pg_temp.entry(d, 1, 'Burpee', '4', '10', '30');
     perform pg_temp.entry(d, 2, 'Rowing machine', '4', '250 m', '60', 'Hard pace');
     insert into public.program_days (program_id, position, name) values (p_fatloss, 1, 'Day 2 · Circuit B') returning id into d;
     perform pg_temp.entry(d, 0, 'Goblet squat', '4', '12', '30', '16 kg');

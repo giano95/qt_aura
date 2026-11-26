@@ -4,7 +4,6 @@
 #include <QDateTime>
 #include <QJsonArray>
 #include <QRegularExpression>
-#include <QSet>
 
 #include <algorithm>
 #include <utility>
@@ -31,15 +30,82 @@ double parseTimestamp(const QString &iso)
 
 // ---- Exercise -----------------------------------------------------------------
 
+const QList<std::pair<QString, QStringList>> &Exercise::muscleTree()
+{
+    static const QList<std::pair<QString, QStringList>> tree{
+        {QStringLiteral("Chest"),
+         {QStringLiteral("Upper Chest"), QStringLiteral("Middle Chest"), QStringLiteral("Lower Chest")}},
+        {QStringLiteral("Back"),
+         {QStringLiteral("Upper Traps"), QStringLiteral("Lower Traps"), QStringLiteral("Lats"),
+          QStringLiteral("Lower Back")}},
+        {QStringLiteral("Legs"),
+         {QStringLiteral("Quads"), QStringLiteral("Hamstrings"), QStringLiteral("Glutes"),
+          QStringLiteral("Abductors"), QStringLiteral("Adductors"), QStringLiteral("Calves")}},
+        {QStringLiteral("Shoulders"),
+         {QStringLiteral("Front Delt"), QStringLiteral("Middle Delt"), QStringLiteral("Rear Delt")}},
+        {QStringLiteral("Arms"),
+         {QStringLiteral("Biceps"), QStringLiteral("Brachialis"), QStringLiteral("Triceps"),
+          QStringLiteral("Forearm")}},
+        {QStringLiteral("Abs"),
+         {QStringLiteral("Upper Abs"), QStringLiteral("Lower Abs"), QStringLiteral("Obliques")}},
+        {QStringLiteral("Cardio"), {}},
+    };
+    return tree;
+}
+
+QStringList Exercise::partsOf(const QString &group)
+{
+    for (const auto &[name, parts] : muscleTree())
+        if (name == group)
+            return parts;
+    return {};
+}
+
+void Exercise::normalizeMuscles()
+{
+    QStringList groups;
+    QStringList parts;
+    for (const auto &[group, groupParts] : muscleTree()) {
+        if (!muscles.contains(group))
+            continue;
+        groups.append(group);
+        for (const QString &part : groupParts)
+            if (subMuscles.contains(part))
+                parts.append(part);
+    }
+    muscles = groups;
+    subMuscles = parts;
+}
+
+QStringList Exercise::muscleTags() const
+{
+    QStringList tags;
+    for (const auto &[group, groupParts] : muscleTree()) {
+        if (!muscles.contains(group))
+            continue;
+        const qsizetype before = tags.size();
+        for (const QString &part : groupParts)
+            if (subMuscles.contains(part))
+                tags.append(part);
+        if (tags.size() == before)
+            tags.append(group);
+    }
+    return tags;
+}
+
 Exercise Exercise::fromJson(const QJsonObject &row)
 {
     Exercise e;
     e.id = str(row, "id");
     e.name = str(row, "name");
-    e.muscle = str(row, "muscle");
+    for (const QJsonValue &v : row.value(QStringLiteral("muscles")).toArray())
+        e.muscles.append(v.toString());
+    for (const QJsonValue &v : row.value(QStringLiteral("sub_muscles")).toArray())
+        e.subMuscles.append(v.toString());
     e.equipment = str(row, "equipment");
     e.instructions = str(row, "instructions");
     e.videoUrl = str(row, "video_url");
+    e.image = str(row, "image");
     e.builtIn = row.value(QStringLiteral("coach_id")).isNull();
     return e;
 }
@@ -315,19 +381,6 @@ QStringList ProgramEntry::changedKeys(int week) const
     return weeks.value(QString::number(week)).toMap().keys();
 }
 
-QList<int> ProgramEntry::changedWeeks() const
-{
-    QList<int> result;
-    for (auto it = weeks.cbegin(); it != weeks.cend(); ++it) {
-        bool ok = false;
-        const int week = it.key().toInt(&ok);
-        if (ok && !it.value().toMap().isEmpty())
-            result.append(week);
-    }
-    std::sort(result.begin(), result.end());
-    return result;
-}
-
 void ProgramEntry::setWeekValue(int week, const QString &key, const QString &value)
 {
     if (week <= 0 || !weeklyKeys().contains(key)) {
@@ -499,18 +552,6 @@ int Program::exerciseCount() const
     for (const ProgramDay &day : days)
         count += day.exercises.size();
     return count;
-}
-
-QList<int> Program::changedWeeks() const
-{
-    QSet<int> set;
-    for (const ProgramDay &day : days)
-        for (const ProgramEntry &entry : day.exercises)
-            for (int week : entry.changedWeeks())
-                set.insert(week);
-    QList<int> result(set.cbegin(), set.cend());
-    std::sort(result.begin(), result.end());
-    return result;
 }
 
 int Program::programWeekFor(int assignmentWeek) const

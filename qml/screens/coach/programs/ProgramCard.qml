@@ -11,7 +11,6 @@ AbstractButton {
     readonly property int dayCount: program.days.length
     readonly property int exerciseCount: ProgramStore.exerciseCount(program)
     readonly property int clientCount: ClientStore.countForProgram(program.id, ClientStore.revision)
-    readonly property int changedWeekCount: ProgramStore.programChangedWeeks(program).length
 
     hoverEnabled: true
     padding: 20
@@ -47,11 +46,6 @@ AbstractButton {
             Chip {
                 visible: card.program.weeks.length > 0
                 text: card.program.weeks === "1" ? qsTr("1 week") : qsTr("%1 weeks").arg(card.program.weeks)
-            }
-            Chip {
-                visible: card.changedWeekCount > 0
-                tone: "accent"
-                text: qsTr("Weekly progression")
             }
         }
 

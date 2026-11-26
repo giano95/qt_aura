@@ -9,8 +9,9 @@ ColumnLayout {
     id: root
 
     property string muscle: ""          // "" = all groups
+    property string subMuscle: ""       // "" = any part of the group
 
-    readonly property var results: ProgramStore.searchExercises(search.text, muscle, ProgramStore.revision)
+    readonly property var results: ProgramStore.searchExercises(search.text, muscle, subMuscle, ProgramStore.revision)
     readonly property int columns: Math.max(1, Math.min(3, Math.floor((width + 16) / 296)))
 
     function createExercise(name) {
@@ -36,25 +37,13 @@ ColumnLayout {
         }
     }
 
-    Flow {
+    MuscleFilter {
         Layout.fillWidth: true
-        spacing: 8
-
-        FilterChip {
-            text: qsTr("All")
-            count: String(ProgramStore.exercises.length)
-            selected: root.muscle === ""
-            onClicked: root.muscle = ""
-        }
-        Repeater {
-            model: ProgramStore.muscleGroups
-            FilterChip {
-                required property string modelData
-                text: modelData
-                count: String(ProgramStore.countByMuscle(modelData, ProgramStore.revision))
-                selected: root.muscle === modelData
-                onClicked: root.muscle = modelData
-            }
+        muscle: root.muscle
+        subMuscle: root.subMuscle
+        onPicked: (group, part) => {
+            root.muscle = group
+            root.subMuscle = part
         }
     }
 
@@ -97,5 +86,6 @@ ColumnLayout {
     ExerciseFormDialog {
         id: formDialog
         presetMuscle: root.muscle
+        presetSubMuscle: root.subMuscle
     }
 }

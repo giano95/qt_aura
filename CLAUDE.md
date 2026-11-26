@@ -109,7 +109,7 @@ Pitfalls:
   (`/mcp` to log in).
 - **Schema changes:** add a new file in `supabase/migrations/`, then apply it
   with MCP `apply_migration` under the file's name minus the timestamp. Never
-  change it only in the dashboard. Migrations 1–5 and `seed.sql` are applied.
+  change it only in the dashboard. Migrations 1–9 and `seed.sql` are applied.
 - Test rules by impersonating a user in a rolled-back transaction:
   `set_config('request.jwt.claims', '{"sub": "<profile id>", "role": "authenticated"}', true)`,
   `set local role authenticated`, call the functions, end with
@@ -190,9 +190,19 @@ Pitfalls:
 - In the coach's calendar, clicking a session opens its details (no menu).
 - Default window 1920×1080, shrunk to fit smaller screens.
 - All stores are C++ (the user wants C++ and unit tests).
-- Exercise images: don't pursue them unless asked.
+- Exercise images come from **Open Exercise Art** (CC BY-SA 4.0), line
+  drawings only: no muscle highlight. Dark lines in the light theme, light
+  lines in the dark one (`ExerciseImage`). Only the DB's exercises ship in
+  `assets/exercises/`; the full set is in `third_party/open-exercise-art/`.
+  To add one: `tools/exercise_images.py <id>`, then set `exercises.image`
+  in a migration. Every built-in exercise has a drawing.
+- The drawings must be credited wherever they are shown or shared (see the
+  README's Credits).
 
 ## Known gaps
+
+- The app doesn't credit Open Exercise Art on any screen yet (CC BY-SA needs
+  it before release). Coaches can't pick a drawing for their own exercises.
 
 - Not designed: **Messages** (both apps) and **Progress** (client). The
   client **Home** still uses `MockData`.

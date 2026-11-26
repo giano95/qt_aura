@@ -6,8 +6,7 @@ import QtQuick.Controls.Basic
 AbstractButton {
     id: card
 
-    property var exercise: ({ id: "", name: "", muscle: "", equipment: "", instructions: "", builtIn: false })
-    readonly property int usage: ProgramStore.usageCount(exercise.id, ProgramStore.revision)
+    property var exercise: ({ id: "", name: "", muscleTags: [], equipment: "", instructions: "", image: "", builtIn: false })
 
     hoverEnabled: true
     padding: 18
@@ -16,6 +15,21 @@ AbstractButton {
 
     contentItem: ColumnLayout {
         spacing: 8
+
+        Rectangle {
+            visible: card.exercise.image !== ""
+            radius: Theme.radius
+            color: Theme.surfaceAlt
+            Layout.fillWidth: true
+            Layout.preferredHeight: 160
+            Layout.bottomMargin: 4
+
+            ExerciseImage {
+                anchors.fill: parent
+                anchors.margins: 8
+                drawing: card.exercise.image
+            }
+        }
 
         Label {
             text: card.exercise.name
@@ -28,7 +42,15 @@ AbstractButton {
             spacing: 6
             Layout.fillWidth: true
 
-            Chip { text: card.exercise.muscle; tone: "primary" }
+            // Each group's parts, or the group itself
+            Repeater {
+                model: card.exercise.muscleTags
+                Chip {
+                    required property string modelData
+                    text: modelData
+                    tone: "primary"
+                }
+            }
             Chip { text: card.exercise.equipment }
             Chip { visible: !card.exercise.builtIn; text: qsTr("Custom"); tone: "accent" }
         }
@@ -43,13 +65,6 @@ AbstractButton {
             Layout.fillWidth: true
         }
         Item { Layout.fillHeight: true }
-        Label {
-            text: card.usage === 0 ? qsTr("Not used in any program")
-                : card.usage === 1 ? qsTr("Used in 1 program")
-                : qsTr("Used in %1 programs").arg(card.usage)
-            color: Theme.textMuted
-            font.pixelSize: Theme.fontSmall
-        }
     }
 
     background: Rectangle {

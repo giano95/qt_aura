@@ -8,7 +8,7 @@
 //
 // Bindings that call a function reading store data must pass `revision` as the
 // last argument (see StoreBase), e.g.
-// ProgramStore.searchExercises(text, muscle, ProgramStore.revision).
+// ProgramStore.searchExercises(text, muscle, subMuscle, ProgramStore.revision).
 #pragma once
 
 #include "program.hpp"
@@ -34,7 +34,10 @@ class ProgramStore : public StoreBase
 public:
     explicit ProgramStore(QObject *parent = nullptr);
 
+    // Muscle groups form a tree: each group has parts (Cardio has none). An
+    // exercise works one or more groups, and optionally parts of each.
     QStringList muscleGroups() const;
+    Q_INVOKABLE QStringList subMuscles(const QString &muscle) const;
     QStringList equipmentTypes() const;
     QStringList weeklyKeys() const { return ProgramEntry::weeklyKeys(); }
     QList<Exercise> exercises() const { return m_exercises; }
@@ -43,16 +46,19 @@ public:
     // ---- exercises (pass `revision` last from bindings) ---------------------
     // The exercise, or null
     Q_INVOKABLE QVariant exerciseById(const QString &id, const QVariant &revision = {}) const;
-    // muscle: "" for all groups; sorted by name
+    // Exercises that work `muscle` ("" = any) and `subMuscle` ("" = any part); by name
     Q_INVOKABLE QList<Exercise> searchExercises(const QString &query, const QString &muscle,
+                                                const QString &subMuscle,
                                                 const QVariant &revision = {}) const;
-    Q_INVOKABLE int countByMuscle(const QString &muscle, const QVariant &revision = {}) const;
+    Q_INVOKABLE int countByMuscle(const QString &muscle, const QString &subMuscle,
+                                  const QVariant &revision = {}) const;
     Q_INVOKABLE bool isExerciseNameTaken(const QString &name, const QString &exceptId,
                                          const QVariant &revision = {}) const;
     // Number of programs that use the exercise
     Q_INVOKABLE int usageCount(const QString &exerciseId, const QVariant &revision = {}) const;
 
-    // { id ("" = new), name, muscle, equipment, instructions, videoUrl }; returns the id
+    // { id ("" = new), name, muscles, subMuscles, equipment, instructions, videoUrl };
+    // returns the id. Parts whose group isn't in muscles are dropped.
     Q_INVOKABLE QString saveExercise(const QVariantMap &exercise);
     // False if the exercise is used in a program or built-in
     Q_INVOKABLE bool deleteExercise(const QString &id);
@@ -85,8 +91,6 @@ public:
     Q_INVOKABLE int weekCount(const QVariant &program, const QVariant &revision = {}) const;
     Q_INVOKABLE QString effective(const QVariant &entry, int week, const QString &key) const;
     Q_INVOKABLE QStringList changedKeys(const QVariant &entry, int week, const QVariant &revision = {}) const;
-    Q_INVOKABLE QList<int> entryChangedWeeks(const QVariant &entry, const QVariant &revision = {}) const;
-    Q_INVOKABLE QList<int> programChangedWeeks(const QVariant &program, const QVariant &revision = {}) const;
     // Changes a draft entry (JS object) in place. Setting the all-weeks value removes the change.
     Q_INVOKABLE void setWeekValue(QJSValue entry, int week, const QString &key, const QString &value) const;
 

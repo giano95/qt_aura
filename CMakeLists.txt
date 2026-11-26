@@ -92,6 +92,7 @@ qt_add_qml_module(appqt_aura
         qml/components/ConfirmDialog.qml
         qml/components/DatePicker.qml
         qml/components/EmptyState.qml
+        qml/components/ExerciseImage.qml
         qml/components/FilterChip.qml
         qml/components/GreetingHeader.qml
         qml/components/IconButton.qml
@@ -135,6 +136,8 @@ qt_add_qml_module(appqt_aura
         qml/screens/coach/programs/ExerciseLibrary.qml
         qml/screens/coach/programs/ExercisePickerDialog.qml
         qml/screens/coach/programs/ExercisesPage.qml
+        qml/screens/coach/programs/MuscleFilter.qml
+        qml/screens/coach/programs/MusclePicker.qml
         qml/screens/coach/programs/ProgramCard.qml
         qml/screens/coach/programs/ProgramEditor.qml
         qml/screens/coach/programs/ProgramExerciseRow.qml
@@ -157,6 +160,25 @@ qt_add_qml_module(appqt_aura
         qml/screens/client/program/ClientExerciseRow.qml
         qml/screens/client/program/ClientProgramPage.qml
 )
+
+# Exercise drawings (Open Exercise Art, CC BY-SA 4.0), one per theme:
+# qrc:/assets/exercises/{light,dark}/<id>.png. Made by tools/exercise_images.py.
+file(GLOB AURA_EXERCISE_IMAGES CONFIGURE_DEPENDS
+    RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+    assets/exercises/light/*.png
+    assets/exercises/dark/*.png
+)
+qt_add_resources(appqt_aura "exercise_images"
+    PREFIX "/"
+    FILES ${AURA_EXERCISE_IMAGES}
+)
+
+# Debug builds compile QML to bytecode only, not to C++: that C++ made the
+# debug executable ~170 MB and linking took over a minute on every build.
+# QML is still checked at build time. Release keeps the faster compiled QML.
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set_target_properties(appqt_aura PROPERTIES QT_QMLCACHEGEN_ARGUMENTS "--only-bytecode")
+endif()
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

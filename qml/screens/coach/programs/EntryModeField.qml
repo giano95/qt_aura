@@ -18,7 +18,6 @@ ColumnLayout {
     property var modes: []
     property string mode: ""
     property string storedText: ""          // the entry's text for the shown week
-    property bool highlighted: false
     property bool modeEditable: true        // false in a week view: modes cover every week
 
     signal edited(string stored)
@@ -60,7 +59,6 @@ ColumnLayout {
         suffix: field.current.suffix
         validator: field.current.pattern ? patternValidator : null
         placeholderText: field.current.placeholder
-        highlighted: field.highlighted
         fieldHeight: 36
         Layout.fillWidth: true
         onTextEdited: field.edited(ProgramStore.modeStored(input.text, field.mode))

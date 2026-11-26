@@ -16,8 +16,7 @@ AbstractButton {
     readonly property string prescription: ProgramStore.prescriptionText(entry, week)
     readonly property string load: ProgramStore.effective(entry, week, "load")
     readonly property string rest: ProgramStore.restText(entry.rest)
-    readonly property bool changedThisWeek: ProgramStore.changedKeys(entry, week).length > 0
-    readonly property bool hasDetails: entry.notes.length > 0 || (exercise !== null && (exercise.instructions.length > 0 || exercise.videoUrl.length > 0))
+    readonly property bool hasDetails: entry.notes.length > 0 || (exercise !== null && (exercise.instructions.length > 0 || exercise.videoUrl.length > 0 || exercise.image.length > 0))
     property bool expanded: false
 
     hoverEnabled: hasDetails
@@ -63,14 +62,14 @@ AbstractButton {
 
                     Label {
                         text: row.prescription
-                        color: row.changedThisWeek ? Theme.accent : Theme.primary
+                        color: Theme.primary
                         font.pixelSize: Theme.fontLarge
                         font.weight: Font.Bold
                     }
                     Label {
                         visible: row.load.length > 0
                         text: "· " + row.load
-                        color: row.changedThisWeek ? Theme.accent : Theme.text
+                        color: Theme.text
                         font.pixelSize: Theme.fontLarge
                         font.weight: Font.DemiBold
                     }
@@ -80,19 +79,7 @@ AbstractButton {
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontLarge
                     }
-                    Chip {
-                        visible: row.changedThisWeek && !row.wide
-                        text: qsTr("Different this week")
-                        tone: "accent"
-                    }
                 }
-            }
-
-            Chip {
-                visible: row.changedThisWeek && row.wide
-                text: qsTr("Different this week")
-                tone: "accent"
-                Layout.alignment: Qt.AlignTop
             }
 
             // Expand / collapse indicator
@@ -138,6 +125,21 @@ AbstractButton {
                 }
             }
 
+            Rectangle {
+                visible: row.exercise !== null && row.exercise.image.length > 0
+                radius: Theme.radius
+                color: Theme.surfaceAlt
+                Layout.fillWidth: true
+                Layout.maximumWidth: 320
+                Layout.preferredHeight: 200
+
+                ExerciseImage {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    drawing: row.exercise ? row.exercise.image : ""
+                }
+            }
+
             ColumnLayout {
                 visible: row.exercise !== null && row.exercise.instructions.length > 0
                 spacing: 4
@@ -156,7 +158,7 @@ AbstractButton {
                     Layout.fillWidth: true
                 }
                 Label {
-                    text: row.exercise ? row.exercise.muscle + " · " + row.exercise.equipment : ""
+                    text: row.exercise ? row.exercise.muscleLabel + " · " + row.exercise.equipment : ""
                     color: Theme.textMuted
                     font.pixelSize: Theme.fontSmall
                 }

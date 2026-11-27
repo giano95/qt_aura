@@ -87,10 +87,11 @@ to see it. Useful ways to try things:
 | **Calendar** | Week view in 30-minute slots. Click or drag to block slots, block or free a whole day, **Edit working hours** (several ranges per day). Client booking requests in amber: click any session to see its details and confirm, decline or cancel |
 | **Programs** | Program list and editor: days, exercises, sets / reps / load / rest / notes, and **per-week changes** (deloads, test weeks) |
 | **Exercises** | Exercise library: search, filter by muscle group, create and edit exercises |
-| Messages | Placeholder |
+| **Messages** | One chat per client, live. Current clients on top, past clients (read-only) in a collapsed list. Unread counts, WhatsApp-style ticks (sent, delivered, read), a pop-up when a message arrives elsewhere in the app. "Message" on the client page opens the chat |
 
 Badges in the menu: **Clients**: green = coaching requests, red = expired
-programs. **Calendar**: green = booking requests.
+programs. **Calendar**: green = booking requests. **Messages**: green = unread
+messages.
 
 ### Client app
 
@@ -100,10 +101,14 @@ programs. **Calendar**: green = booking requests.
 | **My coach** | No coach: coach directory (search, online / in person) and request a coach. Invited: accept or decline. Has a coach: profile, hours, contact, next session, program, stop coaching |
 | **Calendar** | The coach's week in 30-minute slots (free / unavailable). Click or drag to choose start and length (up to 3 h), then request it. The session is pending until the coach confirms. Cancelling is allowed up to 24 h before the start |
 | **My program** | The assigned program, read-only, on the current week, with that week's values. Tap an exercise for notes and instructions |
-| Progress, Messages | Placeholders |
+| **Messages** | Chat with the coach (same as the coach's), plus past coaches read-only. "Message …" on My coach and the Home card open it |
+| Progress | Placeholder |
 
 Every screen has a desktop layout (sidebar) and a phone layout (bottom tab bar),
 plus light and dark themes.
+
+**Settings** (both apps: bottom of the sidebar, or the top bar on phones):
+appearance (System, Light or Dark), saved on the device.
 
 ---
 
@@ -121,11 +126,15 @@ src/                    C++ (Phase 2)
                           ProgramStore (programs, exercise library), ClientStore
                           (clients, assignments), CoachStore (directory, requests,
                           invitations, visibility), CalendarStore (hours, blocked
-                          slots, sessions, bookings); StoreBase (what they share)
+                          slots, sessions, bookings), MessageStore (conversations,
+                          messages); StoreBase (what they share); AppSettings
+                          (settings saved on the device: theme)
 supabase/               Database: migrations/ (schema, rules, RLS) and seed.sql (demo data)
 assets/exercises/       Exercise drawings the app ships, light/ and dark/ (one per theme)
+assets/chat/            Chat background tile (fitness doodles), one per theme, + @2x
 third_party/            open-exercise-art/: all 562 drawings (SVG) and their license
-tools/                  exercise_images.py: makes assets/exercises/ PNGs from a drawing id
+tools/                  exercise_images.py: makes assets/exercises/ PNGs from a drawing id;
+                        chat_pattern.py: makes assets/chat/ from chat_pattern/source.jpeg
 qml/
   theme/Theme.qml       Design tokens (colors, radii, font sizes), light/dark
   services/MockData.qml  leftover sample content for the dashboards
@@ -134,7 +143,8 @@ qml/
     auth/                 welcome, login, signup
     coach/                CoachHome + dashboard, clients/, calendar/, programs/
     client/               ClientHome + dashboard, coach/, calendar/, program/
-importedcontent/        Qt Creator's Figma import folder (unused)
+    messages/             Messages page, chat, bubbles, composer, new-message pop-up (both apps)
+    settings/             Settings page (both apps)
 ```
 
 ### Architecture in one paragraph
@@ -155,8 +165,8 @@ flowchart TB
     subgraph screens["QML screens (qml/)"]
         main["Main.qml<br/>window, router, splash"]
         authFlow["AuthFlow<br/>welcome · login · signup"]
-        coachHome["CoachHome<br/>dashboard · clients · calendar · programs · exercises"]
-        clientHome["ClientHome<br/>home · my coach · calendar · my program"]
+        coachHome["CoachHome<br/>dashboard · clients · calendar · programs · exercises · messages"]
+        clientHome["ClientHome<br/>home · my coach · calendar · my program · messages"]
         main --> authFlow & coachHome & clientHome
     end
 
@@ -166,12 +176,14 @@ flowchart TB
         clientStore["ClientStore<br/>clients · assignments"]
         coachStore["CoachStore<br/>directory · requests · invitations"]
         calendarStore["CalendarStore<br/>hours · blocked slots · sessions"]
+        messageStore["MessageStore<br/>conversations · messages · unread"]
         storeBase["StoreBase<br/>loading · write queue · revision"]
-        programStore & clientStore & coachStore & calendarStore -->|"derive from"| storeBase
+        appSettings["AppSettings<br/>theme · saved on the device (QSettings)"]
+        programStore & clientStore & coachStore & calendarStore & messageStore -->|"derive from"| storeBase
         clientStore -->|"reads programs to assign"| programStore
     end
 
-    models["Value types (src/models)<br/>auraUser · program · exercise · client · assignment<br/>coach · coaching · calendarSession"]
+    models["Value types (src/models)<br/>auraUser · program · exercise · client · assignment<br/>coach · coaching · calendarSession · chatMessage · conversation"]
 
     subgraph net["Backend client (src/supabase)"]
         supabaseClient["SupabaseClient<br/>auth · tokens · tables · RPC<br/>notifyChanged"]
@@ -232,16 +244,20 @@ sequenceDiagram
     storeB-->>client: bump revision, bindings refresh
 ```
 
+`MessageStore` works the same way, but on a notice it re-reads only the
+conversation list (`conversations()`) and the messages newer than the ones it
+has, not whole conversations.
+
 ---
 
 ## Roadmap
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | Scope and design every screen in QML, with sample data | **Mostly done.** Messages and Progress are still to design |
+| 0 | Scope and design every screen in QML, with sample data | **Mostly done.** Progress is still to design |
 | 1 | Backend: Supabase (Postgres) in an EU region, row-level security, auth, migrations in git | **Done.** Schema, rules and demo data in `supabase/` |
 | 2 | Qt ↔ backend: C++ `SupabaseClient` (HTTPS / JSON / tokens), replace stores with C++; QtKeychain later | **Mostly done.** All stores are C++ on Supabase, live updates (Realtime), stay logged in (QtKeychain). Left: unit tests |
-| 3 | Remaining core features on real data (messages, progress, session notes) | Not started |
+| 3 | Remaining core features on real data (messages, progress, session notes) | **Started.** Text messages done; images and voice messages later |
 | 4 | Offline: SQLite cache, sync queue | Not started |
 | 5 | Desktop release: packaging, code signing, CI installers | Not started |
 | 6 | iOS / Android builds, push notifications | Not started. Phone layouts already exist |
@@ -258,7 +274,9 @@ profiles (every account) · coach_profiles (public profile, visibility) ·
 coachings (requests, invitations, active and past coach–client links) ·
 assignments · programs · program_days · program_entries (with per-week
 changes) · exercises (built-in + each coach's own) · working_hours ·
-blocked_slots · sessions (status, who cancelled). See `supabase/migrations/`.
+blocked_slots · sessions (status, who cancelled) · messages (one conversation
+per coaching) · message_reads (how far each side has received and read: unread counts and ticks). See
+`supabase/migrations/`.
 
 ## Credits
 

@@ -8,6 +8,7 @@
 #include <QJSEngine>
 #include <QJsonArray>
 #include <QLocale>
+#include <QSet>
 
 #include <algorithm>
 
@@ -47,6 +48,15 @@ QStringList ProgramStore::muscleGroups() const
 QStringList ProgramStore::subMuscles(const QString &muscle) const
 {
     return Exercise::partsOf(muscle);
+}
+
+QStringList ProgramStore::groupsMissingParts(const QStringList &muscles, const QStringList &subMuscles) const
+{
+    Exercise e;
+    e.muscles = muscles;
+    e.subMuscles = subMuscles;
+    e.normalizeMuscles();
+    return e.groupsMissingParts();
 }
 
 QStringList ProgramStore::equipmentTypes() const
@@ -199,6 +209,10 @@ QString ProgramStore::saveExercise(const QVariantMap &input)
     exercise.normalizeMuscles();
     if (exercise.muscles.isEmpty()) {
         emit errorOccurred(tr("Choose at least one muscle group."));
+        return isNew ? QString() : exercise.id;
+    }
+    if (const QStringList missing = exercise.groupsMissingParts(); !missing.isEmpty()) {
+        emit errorOccurred(tr("Choose at least one part of %1.").arg(missing.join(QStringLiteral(", "))));
         return isNew ? QString() : exercise.id;
     }
     exercise.equipment = input.value(QStringLiteral("equipment")).toString();
@@ -373,6 +387,47 @@ int ProgramStore::weekCount(const QVariant &program, const QVariant &) const
 QString ProgramStore::effective(const QVariant &entry, int week, const QString &key) const
 {
     return ProgramEntry::fromVariant(entry).effective(week, key);
+}
+
+QVariantMap ProgramStore::muscleSummary(const QVariant &program, int week, const QString &metric,
+                                        const QVariant &, const QVariant &) const
+{
+    const bool sets = metric == QLatin1String("sets");
+    int total = 0;
+    QHash<QString, int> values;     // by group or part name (no name is both)
+    const Program p = Program::fromVariant(program);
+    for (const ProgramDay &day : p.days) {
+        for (const ProgramEntry &entry : day.exercises) {
+            const int value = sets ? std::max(0, entry.effective(week, QStringLiteral("sets")).toInt()) : 1;
+            total += value;
+
+            const auto exercise = std::find_if(m_exercises.cbegin(), m_exercises.cend(),
+                                               [&](const Exercise &e) { return e.id == entry.exerciseId; });
+            if (exercise == m_exercises.cend())
+                continue;
+            const QStringList names = exercise->muscles + exercise->subMuscles;
+            for (const QString &name : QSet<QString>(names.cbegin(), names.cend()))
+                values[name] += value;
+        }
+    }
+
+    const auto row = [](const QString &name, int value, int of) {
+        return QVariantMap{{QStringLiteral("name"), name},
+                           {QStringLiteral("value"), value},
+                           {QStringLiteral("share"), of > 0 ? std::min(1.0, double(value) / of) : 0.0}};
+    };
+    QVariantList groups;
+    for (const auto &[group, parts] : Exercise::muscleTree()) {
+        const int groupValue = values.value(group);
+        QVariantList partRows;
+        for (const QString &part : parts)
+            partRows.append(row(part, values.value(part), groupValue));
+        QVariantMap groupRow = row(group, groupValue, total);
+        groupRow.insert(QStringLiteral("parts"), partRows);
+        groups.append(groupRow);
+    }
+    return {{QStringLiteral("total"), total},
+            {QStringLiteral("groups"), groups}};
 }
 
 QStringList ProgramStore::changedKeys(const QVariant &entry, int week, const QVariant &) const

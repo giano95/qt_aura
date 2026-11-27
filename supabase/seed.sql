@@ -309,4 +309,33 @@ begin
         from public.profiles p where p.name = c.name and p.role = 'client';
         req_day := req_day + 2;
     end loop;
+
+    -- ---- Giulia's messages -------------------------------------------------
+    -- Luca's latest question is still unread for Giulia; Sara's chat is read
+    insert into public.messages (coaching_id, sender_id, body, created_at)
+    select co.id, case when t.from_coach then co.coach_id else co.client_id end, t.body, now() - t.ago
+    from (values
+        ('client@aura.app', true, 'Great work in Monday''s session. Next week we add 2.5 kg to the squat.', interval '20 hours'),
+        ('client@aura.app', false, 'Thanks! My knees felt much better with the wider stance.', interval '19 hours 25 minutes'),
+        ('client@aura.app', true, 'That''s exactly why we changed it. Keep the same depth.', interval '19 hours 20 minutes'),
+        ('client@aura.app', false, 'Quick question: should I deload this week or keep going?', interval '2 hours'),
+        ('sara.conti@example.com', true, 'Hi Sara, here''s the plan for this week: three sessions plus two long walks.', interval '2 days 3 hours'),
+        ('sara.conti@example.com', false, 'Perfect, I''ll start tomorrow 😊', interval '2 days 1 hour')
+    ) as t(email, from_coach, body, ago)
+    join public.coachings co on co.coach_id = giulia and co.email = t.email;
+
+    -- Giulia's app has received Luca's question but she hasn't read it: Luca
+    -- sees blue ticks on his first message and grey ones on the question
+    insert into public.message_reads (coaching_id, profile_id, last_read_at, last_delivered_at)
+    select co.id, x.who, x.until, coalesce(x.received, x.until)
+    from public.coachings co
+    cross join lateral (values
+        (co.coach_id, case when co.email = 'client@aura.app' then now() - interval '19 hours 20 minutes'
+                           else now() - interval '2 days 1 hour' end,
+                      case when co.email = 'client@aura.app' then now() - interval '2 hours' end),
+        (co.client_id, case when co.email = 'client@aura.app' then now() - interval '2 hours'
+                            else now() - interval '2 days 1 hour' end,
+                       null::timestamptz)
+    ) as x(who, until, received)
+    where co.coach_id = giulia and co.email in ('client@aura.app', 'sara.conti@example.com');
 end $$;

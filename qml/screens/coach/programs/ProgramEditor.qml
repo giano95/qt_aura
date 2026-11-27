@@ -331,6 +331,16 @@ Item {
                     }
                 }
 
+                // ---- exercises and sets per muscle, for the week picked below ----
+                MuscleSummary {
+                    visible: editor.totalExercises > 0
+                    Layout.fillWidth: true
+                    program: editor.draft
+                    week: editor.week
+                    revision: editor.revision
+                    wide: editor.wide
+                }
+
                 // ---- days + week selector ----
                 ColumnLayout {
                     spacing: 10

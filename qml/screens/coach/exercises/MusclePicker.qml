@@ -5,14 +5,17 @@ import QtQuick.Layouts
 import QtQuick.Controls.Basic
 
 // Choose the muscles an exercise works (exercise form): any number of groups
-// and, under each chosen group, indented, any of its parts. No part chosen
-// means the whole group. Unchoosing a group also drops its parts.
+// and, under each chosen group, indented, its parts. Each chosen group needs
+// at least one part (Cardio has none); the form checks that and passes the
+// groups still missing one in missingGroups. Unchoosing a group also drops
+// its parts.
 // The owner keeps the choice: it reacts to chosen() and binds it back.
 ColumnLayout {
     id: root
 
     property var muscles: []
     property var subMuscles: []
+    property var missingGroups: []      // shown in red
 
     // Chosen groups that have parts, in display order
     readonly property var openGroups: ProgramStore.muscleGroups.filter(
@@ -74,8 +77,8 @@ ColumnLayout {
                 Layout.fillWidth: true
 
                 Label {
-                    text: qsTr("Parts of %1 (optional)").arg(branch.modelData)
-                    color: Theme.textMuted
+                    text: qsTr("Parts of %1").arg(branch.modelData)
+                    color: root.missingGroups.includes(branch.modelData) ? Theme.danger : Theme.textMuted
                     font.pixelSize: Theme.fontSmall
                 }
                 Flow {

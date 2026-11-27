@@ -5,9 +5,11 @@ import QtQuick.Layouts
 import QtQuick.Controls.Basic
 
 // Frame shared by the coach app and the client app.
-//  - wide window (desktop): sidebar with navigation, theme toggle, user, log out
-//  - narrow window (phone): top bar + bottom tab bar
+//  - wide window (desktop): sidebar with navigation, Settings, user, log out
+//  - narrow window (phone): top bar (Settings, log out) + bottom tab bar
 // Pages are declared as children and shown one at a time by currentIndex.
+// Settings isn't one of them (tab indexes stay the same): it covers the
+// current page until a tab is picked.
 Item {
     id: shell
 
@@ -16,9 +18,45 @@ Item {
     property var navBadges: []               // per nav item (same order): list of { count, tone, label } (see NavButton)
     property int currentIndex: 0
     property string roleLabel: ""
+    // Index of the Messages page: a message arriving while its chat isn't on
+    // screen pops up a MessageToast that opens it. -1 = no pop-ups.
+    property int messagesIndex: -1
+    // The Settings page is shown instead of the current page
+    property bool settingsOpen: false
     default property alias pages: pageStack.data
 
     readonly property bool wide: width >= 820
+
+    // Going to a page (a tab, a link inside a page, a pop-up) closes Settings
+    onCurrentIndexChanged: settingsOpen = false
+
+    function showPage(index) {
+        settingsOpen = false
+        currentIndex = index
+    }
+
+    MessageToast {
+        id: messageToast
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 16
+        anchors.bottomMargin: shell.wide ? 16 : 76
+        onOpenRequested: id => {
+            MessageStore.open(id)
+            shell.showPage(shell.messagesIndex)
+        }
+    }
+
+    Connections {
+        target: MessageStore
+        enabled: shell.messagesIndex >= 0
+        function onMessageReceived(conversationId, senderName, body) {
+            if (!shell.settingsOpen && shell.currentIndex === shell.messagesIndex
+                    && MessageStore.selectedId === conversationId)
+                return
+            messageToast.show(conversationId, senderName, body)
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -75,18 +113,18 @@ Item {
                         Layout.fillWidth: true
                         text: modelData
                         badges: shell.navBadges[sideNavButton.index] || []
-                        current: sideNavButton.index === shell.currentIndex
-                        onClicked: shell.currentIndex = sideNavButton.index
+                        current: sideNavButton.index === shell.currentIndex && !shell.settingsOpen
+                        onClicked: shell.showPage(sideNavButton.index)
                     }
                 }
 
                 Item { Layout.fillHeight: true }
 
-                AuraButton {
+                NavButton {
                     Layout.fillWidth: true
-                    variant: "ghost"
-                    text: Theme.dark ? qsTr("Switch to light mode") : qsTr("Switch to dark mode")
-                    onClicked: Theme.dark = !Theme.dark
+                    text: qsTr("Settings")
+                    current: shell.settingsOpen
+                    onClicked: shell.settingsOpen = true
                 }
 
                 Rectangle {
@@ -168,6 +206,14 @@ Item {
                     }
                     Item { Layout.fillWidth: true }
                     AuraButton {
+                        variant: shell.settingsOpen ? "secondary" : "ghost"
+                        text: qsTr("Settings")
+                        leftPadding: 10
+                        rightPadding: 10
+                        Accessible.checked: shell.settingsOpen
+                        onClicked: shell.settingsOpen = true
+                    }
+                    AuraButton {
                         variant: "ghost"
                         text: qsTr("Log out")
                         leftPadding: 10
@@ -179,9 +225,16 @@ Item {
 
             StackLayout {
                 id: pageStack
+                visible: !shell.settingsOpen
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 currentIndex: shell.currentIndex
+            }
+
+            SettingsPage {
+                visible: shell.settingsOpen
+                Layout.fillWidth: true
+                Layout.fillHeight: true
             }
 
             // ---- tab bar (phone) ----
@@ -214,8 +267,8 @@ Item {
                             Layout.fillHeight: true
                             text: modelData
                             badges: shell.navBadges[tabButton.index] || []
-                            current: tabButton.index === shell.currentIndex
-                            onClicked: shell.currentIndex = tabButton.index
+                            current: tabButton.index === shell.currentIndex && !shell.settingsOpen
+                            onClicked: shell.showPage(tabButton.index)
                         }
                     }
                 }

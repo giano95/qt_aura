@@ -12,7 +12,7 @@ AuraDialog {
     // Built-in library exercises are read-only
     property bool builtIn: false
     property var muscles: []                // groups worked
-    property var subMuscles: []             // parts of them; none = the whole group
+    property var subMuscles: []             // parts of them: at least one per group (Cardio has none)
     property string equipment: ""
     property string presetMuscle: ""        // preselected group and part for new exercises
     property string presetSubMuscle: ""
@@ -30,7 +30,17 @@ AuraDialog {
             return qsTr("An exercise with this name already exists.")
         return ""
     }
-    readonly property string muscleError: submitted && muscles.length === 0 ? qsTr("Choose at least one muscle group.") : ""
+    // Chosen groups with none of their parts chosen yet
+    readonly property var groupsMissingParts: Array.from(ProgramStore.groupsMissingParts(muscles, subMuscles))
+    readonly property string muscleError: {
+        if (!submitted)
+            return ""
+        if (muscles.length === 0)
+            return qsTr("Choose at least one muscle group.")
+        if (groupsMissingParts.length > 0)
+            return qsTr("Choose at least one part of %1.").arg(groupsMissingParts.join(", "))
+        return ""
+    }
     readonly property string equipmentError: submitted && equipment === "" ? qsTr("Choose the equipment.") : ""
 
     signal saved(string exerciseId)
@@ -95,14 +105,6 @@ AuraDialog {
         text: qsTr("This exercise is part of the built-in library, so it can't be changed. To adapt it, create your own exercise with a different name.")
     }
 
-    Notice {
-        tone: "info"
-        visible: !dialog.isNew && dialog.usage > 0
-        Layout.fillWidth: true
-        text: (dialog.usage === 1 ? qsTr("Used in 1 program.") : qsTr("Used in %1 programs.").arg(dialog.usage))
-              + " " + qsTr("Changes apply everywhere it's used.")
-    }
-
     AuraTextField {
         id: nameField
         Layout.fillWidth: true
@@ -125,6 +127,7 @@ AuraDialog {
             visible: !dialog.builtIn
             muscles: dialog.muscles
             subMuscles: dialog.subMuscles
+            missingGroups: dialog.submitted ? dialog.groupsMissingParts : []
             Layout.fillWidth: true
             onChosen: (groups, parts) => {
                 dialog.muscles = groups

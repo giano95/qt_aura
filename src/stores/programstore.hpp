@@ -35,9 +35,13 @@ public:
     explicit ProgramStore(QObject *parent = nullptr);
 
     // Muscle groups form a tree: each group has parts (Cardio has none). An
-    // exercise works one or more groups, and optionally parts of each.
+    // exercise works one or more groups, and at least one part of each.
     QStringList muscleGroups() const;
     Q_INVOKABLE QStringList subMuscles(const QString &muscle) const;
+    // Groups in `muscles` that have parts but none in `subMuscles`; saving
+    // needs this empty
+    Q_INVOKABLE QStringList groupsMissingParts(const QStringList &muscles,
+                                               const QStringList &subMuscles) const;
     QStringList equipmentTypes() const;
     QStringList weeklyKeys() const { return ProgramEntry::weeklyKeys(); }
     QList<Exercise> exercises() const { return m_exercises; }
@@ -58,7 +62,8 @@ public:
     Q_INVOKABLE int usageCount(const QString &exerciseId, const QVariant &revision = {}) const;
 
     // { id ("" = new), name, muscles, subMuscles, equipment, instructions, videoUrl };
-    // returns the id. Parts whose group isn't in muscles are dropped.
+    // returns the id. Parts whose group isn't in muscles are dropped. Each
+    // group needs one of its parts (see groupsMissingParts).
     Q_INVOKABLE QString saveExercise(const QVariantMap &exercise);
     // False if the exercise is used in a program or built-in
     Q_INVOKABLE bool deleteExercise(const QString &id);
@@ -91,6 +96,17 @@ public:
     Q_INVOKABLE int weekCount(const QVariant &program, const QVariant &revision = {}) const;
     Q_INVOKABLE QString effective(const QVariant &entry, int week, const QString &key) const;
     Q_INVOKABLE QStringList changedKeys(const QVariant &entry, int week, const QVariant &revision = {}) const;
+    // How much of one week of a program (week 0 = the all-weeks values) goes
+    // to each muscle, by `metric`: "exercises" or "sets". Returns
+    //   { total, groups: [{ name, value, share, parts: [{ name, value, share }] }] }
+    // with every group in tree order and every part. total is the whole
+    // program's; a group's share is value / total, a part's is value / its
+    // group's value (0 when that is 0). An exercise counts for every group and
+    // part it works, so group shares add up to more than 1.
+    // Pass the editor's revision for in-place edits.
+    Q_INVOKABLE QVariantMap muscleSummary(const QVariant &program, int week, const QString &metric,
+                                          const QVariant &draftRevision = {},
+                                          const QVariant &revision = {}) const;
     // Changes a draft entry (JS object) in place. Setting the all-weeks value removes the change.
     Q_INVOKABLE void setWeekValue(QJSValue entry, int week, const QString &key, const QString &value) const;
 

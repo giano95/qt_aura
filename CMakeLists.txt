@@ -36,11 +36,6 @@ target_compile_definitions(qt6keychain PUBLIC QT6KEYCHAIN_STATIC_DEFINE)
 set(AURA_SUPABASE_URL "https://dpijfmdalkhbgfxkrwws.supabase.co" CACHE STRING "Supabase project URL")
 set(AURA_SUPABASE_KEY "sb_publishable_KLY2dgRe6UC6P6w9tPiqCg_R2XhGvrA" CACHE STRING "Supabase publishable key")
 
-# Content of downloaded design from Figma to Qt or similar
-if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/importedcontent/CMakeLists.txt")
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/importedcontent)
-endif()
-
 qt_add_executable(appqt_aura
     main.cpp
 )
@@ -65,12 +60,15 @@ qt_add_qml_module(appqt_aura
         src/models/program.hpp src/models/program.cpp
         src/models/coaching.hpp src/models/coaching.cpp
         src/models/calendar.hpp src/models/calendar.cpp
+        src/models/message.hpp src/models/message.cpp
         src/stores/storebase.hpp src/stores/storebase.cpp
         src/stores/session.hpp src/stores/session.cpp
         src/stores/programstore.hpp src/stores/programstore.cpp
         src/stores/clientstore.hpp src/stores/clientstore.cpp
         src/stores/coachstore.hpp src/stores/coachstore.cpp
         src/stores/calendarstore.hpp src/stores/calendarstore.cpp
+        src/stores/messagestore.hpp src/stores/messagestore.cpp
+        src/stores/appsettings.hpp src/stores/appsettings.cpp
     QML_FILES
         Main.qml
         ${AURA_QML_SINGLETONS}
@@ -82,10 +80,10 @@ qt_add_qml_module(appqt_aura
         qml/components/AuraMenu.qml
         qml/components/AuraTextArea.qml
         qml/components/AuraTextField.qml
-        qml/components/AuthPage.qml
+        qml/screens/auth/AuthPage.qml
         qml/components/Avatar.qml
         qml/components/BrandMark.qml
-        qml/components/BrandPanel.qml
+        qml/screens/auth/BrandPanel.qml
         qml/components/Card.qml
         qml/components/CheckRow.qml
         qml/components/Chip.qml
@@ -131,19 +129,18 @@ qt_add_qml_module(appqt_aura
         qml/screens/coach/clients/InviteClientDialog.qml
         qml/screens/coach/programs/DayCard.qml
         qml/screens/coach/programs/EntryModeField.qml
-        qml/screens/coach/programs/ExerciseCard.qml
-        qml/screens/coach/programs/ExerciseFormDialog.qml
-        qml/screens/coach/programs/ExerciseLibrary.qml
         qml/screens/coach/programs/ExercisePickerDialog.qml
-        qml/screens/coach/programs/ExercisesPage.qml
-        qml/screens/coach/programs/MuscleFilter.qml
-        qml/screens/coach/programs/MusclePicker.qml
+        qml/screens/coach/programs/MuscleSummary.qml
         qml/screens/coach/programs/ProgramCard.qml
         qml/screens/coach/programs/ProgramEditor.qml
         qml/screens/coach/programs/ProgramExerciseRow.qml
-        qml/screens/coach/programs/ProgramList.qml
         qml/screens/coach/programs/ProgramsHome.qml
         qml/screens/coach/programs/ProgramsSection.qml
+        qml/screens/coach/exercises/ExerciseCard.qml
+        qml/screens/coach/exercises/ExerciseFormDialog.qml
+        qml/screens/coach/exercises/ExercisesPage.qml
+        qml/screens/coach/exercises/MuscleFilter.qml
+        qml/screens/coach/exercises/MusclePicker.qml
         qml/screens/client/ClientHome.qml
         qml/screens/client/ClientDashboard.qml
         qml/screens/client/calendar/ClientBookingCalendar.qml
@@ -159,6 +156,14 @@ qt_add_qml_module(appqt_aura
         qml/screens/client/program/ClientDayCard.qml
         qml/screens/client/program/ClientExerciseRow.qml
         qml/screens/client/program/ClientProgramPage.qml
+        qml/screens/messages/ConversationRow.qml
+        qml/screens/messages/MessageBubble.qml
+        qml/screens/messages/MessageTicks.qml
+        qml/screens/messages/MessageComposer.qml
+        qml/screens/messages/MessagesPage.qml
+        qml/screens/messages/MessageThread.qml
+        qml/screens/messages/MessageToast.qml
+        qml/screens/settings/SettingsPage.qml
 )
 
 # Exercise drawings (Open Exercise Art, CC BY-SA 4.0), one per theme:
@@ -171,6 +176,17 @@ file(GLOB AURA_EXERCISE_IMAGES CONFIGURE_DEPENDS
 qt_add_resources(appqt_aura "exercise_images"
     PREFIX "/"
     FILES ${AURA_EXERCISE_IMAGES}
+)
+
+# Chat background tiles, one per theme (+ @2x for high-DPI screens):
+# qrc:/assets/chat/pattern-{light,dark}.png. Made by tools/chat_pattern.py.
+qt_add_resources(appqt_aura "chat_pattern"
+    PREFIX "/"
+    FILES
+        assets/chat/pattern-light.png
+        assets/chat/pattern-light@2x.png
+        assets/chat/pattern-dark.png
+        assets/chat/pattern-dark@2x.png
 )
 
 # Debug builds compile QML to bytecode only, not to C++: that C++ made the

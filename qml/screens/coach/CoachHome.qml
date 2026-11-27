@@ -4,10 +4,16 @@ import QtQuick
 AppShell {
     id: shell
 
+    // Tab order matters: pages navigate by index (see CoachDashboard)
+    readonly property int clientsTab: 1
+    readonly property int programsTab: 3
+
     roleLabel: qsTr("Coach")
+    messagesIndex: 5
     navItems: [qsTr("Dashboard"), qsTr("Clients"), qsTr("Calendar"), qsTr("Programs"), qsTr("Exercises"), qsTr("Messages")]
     compactNavItems: [qsTr("Home"), qsTr("Clients"), qsTr("Calendar"), qsTr("Programs"), qsTr("Exercises"), qsTr("Messages")]
-    // Counts: requests waiting for an answer (primary), expired programs (red)
+    // Counts: requests waiting for an answer (primary), expired programs (red),
+    // unread messages (primary)
     navBadges: [
         [],
         [
@@ -17,7 +23,10 @@ AppShell {
         [
             { count: CalendarStore.pendingBookings.length, tone: "primary", label: qsTr("booking requests") }
         ],
-        [], [], []
+        [], [],
+        [
+            { count: MessageStore.unreadTotal, tone: "primary", label: qsTr("unread messages") }
+        ]
     ]
 
     CoachDashboard {
@@ -25,9 +34,13 @@ AppShell {
     }
 
     ClientsSection {
+        onMessageRequested: coachingId => {
+            MessageStore.open(coachingId)
+            shell.currentIndex = shell.messagesIndex
+        }
         onOpenProgramRequested: (programId, clientName) => {
             programsSection.openProgram(programId, clientName ? "← " + clientName : qsTr("← Back"))
-            shell.currentIndex = 3
+            shell.currentIndex = shell.programsTab
         }
     }
 
@@ -35,18 +48,12 @@ AppShell {
 
     ProgramsSection {
         id: programsSection
-        onReturnRequested: shell.currentIndex = 1
+        onReturnRequested: shell.currentIndex = shell.clientsTab
     }
 
     ExercisesPage {}
 
-    PlaceholderPage {
-        title: qsTr("Messages")
-        summary: qsTr("One conversation per client, plus their check-in answers.")
-        plannedFeatures: [
-            qsTr("Message thread per client"),
-            qsTr("Weekly check-in forms and answers"),
-            qsTr("Unread badges and notifications")
-        ]
+    MessagesPage {
+        coach: true
     }
 }

@@ -28,8 +28,8 @@ struct Exercise
 
     Q_PROPERTY(QString id MEMBER id FINAL)
     Q_PROPERTY(QString name MEMBER name FINAL)
-    // Muscle groups worked, and parts of them (see muscleTree()). A group
-    // with none of its parts listed means the whole group.
+    // Muscle groups worked, and parts of them (see muscleTree()). Each group
+    // lists at least one of its parts, except groups that have none (Cardio).
     Q_PROPERTY(QStringList muscles MEMBER muscles FINAL)
     Q_PROPERTY(QStringList subMuscles MEMBER subMuscles FINAL)
     // Each group's parts, or the group itself: ["Middle Chest", "Triceps", "Cardio"]
@@ -61,6 +61,8 @@ public:
     static QStringList partsOf(const QString &group);
     // Keeps known groups, and parts whose group is listed, both in tree order
     void normalizeMuscles();
+    // Listed groups that have parts but none of them listed (not allowed)
+    QStringList groupsMissingParts() const;
 
     QStringList muscleTags() const;
     QString muscleLabel() const { return muscleTags().join(QStringLiteral(", ")); }

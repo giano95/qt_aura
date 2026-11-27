@@ -106,6 +106,6 @@ Item {
         anchors.margins: 12
         variant: "ghost"
         text: Theme.dark ? qsTr("Light mode") : qsTr("Dark mode")
-        onClicked: Theme.dark = !Theme.dark
+        onClicked: AppSettings.themeMode = Theme.dark ? "light" : "dark"
     }
 }

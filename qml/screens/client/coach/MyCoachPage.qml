@@ -339,7 +339,10 @@ Item {
 
                             AuraButton {
                                 text: qsTr("Message %1").arg(page.firstName)
-                                onClicked: page.navigateRequested(page.messagesTab)
+                                onClicked: {
+                                    MessageStore.open(page.relation.id)
+                                    page.navigateRequested(page.messagesTab)
+                                }
                             }
                             AuraButton {
                                 variant: "secondary"

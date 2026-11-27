@@ -6,8 +6,17 @@ AppShell {
 
     roleLabel: qsTr("Client")
     // Tab order matters: pages navigate by index (see MyCoachPage / ClientDashboard)
+    readonly property int coachTab: 1
     navItems: [qsTr("Home"), qsTr("My coach"), qsTr("Calendar"), qsTr("My program"), qsTr("Progress"), qsTr("Messages")]
     compactNavItems: [qsTr("Home"), qsTr("Coach"), qsTr("Calendar"), qsTr("Program"), qsTr("Progress"), qsTr("Messages")]
+    messagesIndex: 5
+    // Counts: unread messages (primary)
+    navBadges: [
+        [], [], [], [], [],
+        [
+            { count: MessageStore.unreadTotal, tone: "primary", label: qsTr("unread messages") }
+        ]
+    ]
 
     ClientDashboard {
         onNavigateRequested: index => shell.currentIndex = index
@@ -33,13 +42,8 @@ AppShell {
         ]
     }
 
-    PlaceholderPage {
-        title: qsTr("Messages")
-        summary: qsTr("Your conversation with your coach.")
-        plannedFeatures: [
-            qsTr("Message thread with your coach"),
-            qsTr("Weekly check-in form"),
-            qsTr("Notifications for new messages")
-        ]
+    MessagesPage {
+        coach: false
+        onFindCoachRequested: shell.currentIndex = shell.coachTab
     }
 }

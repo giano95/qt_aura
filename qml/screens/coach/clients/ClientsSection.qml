@@ -9,6 +9,7 @@ StackView {
     id: stack
 
     signal openProgramRequested(string programId, string clientName)
+    signal messageRequested(string coachingId)
 
     initialItem: listComponent
 
@@ -24,6 +25,7 @@ StackView {
         ClientDetail {
             onCloseRequested: stack.pop()
             onOpenProgramRequested: (programId, clientName) => stack.openProgramRequested(programId, clientName)
+            onMessageRequested: coachingId => stack.messageRequested(coachingId)
         }
     }
 

@@ -6,8 +6,11 @@ import QtQuick
 QtObject {
     id: theme
 
-    // Follows the OS color scheme until the user toggles it manually.
-    property bool dark: Application.styleHints.colorScheme === Qt.Dark
+    // The user's choice in Settings (AppSettings.themeMode); "system" follows
+    // the OS color scheme.
+    readonly property bool dark: AppSettings.themeMode === "dark"
+                                 || (AppSettings.themeMode !== "light"
+                                     && Application.styleHints.colorScheme === Qt.Dark)
 
     // Surfaces
     readonly property color background: dark ? "#111513" : "#F5F4F0"
@@ -28,6 +31,11 @@ QtObject {
     readonly property color accentSoft: dark ? "#3A2C17" : "#FBEBD3"
     readonly property color danger: dark ? "#FF8A80" : "#B3261E"
     readonly property color dangerSoft: dark ? "#3B1D1B" : "#FBE3E1"
+    // "Read" ticks on messages: on the page / on the user's own bubble (primary)
+    readonly property color receiptRead: dark ? "#6CB8FF" : "#1A73E8"
+    readonly property color receiptReadOnPrimary: dark ? "#0038C8" : "#8AD8FF"
+    // Doodles behind the messages (lines in Theme.text, drawn this faint)
+    readonly property real chatPatternOpacity: dark ? 0.07 : 0.08
 
     // Brand gradient, identical in light and dark mode
     readonly property color brandTop: "#0F8A70"

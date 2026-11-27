@@ -98,6 +98,9 @@ Pitfalls:
   doesn't. JS globals don't persist between expressions.
 - Set `AURA_NO_SAVED_LOGIN=1` when the driver logs in by itself, or a saved
   login is restored at startup and races it.
+- Switch themes with `AppSettings.themeMode = 'dark'` (`Theme.dark` is
+  read-only). It's saved, so give the driver its own
+  `setOrganizationName(...)`, or it changes the real app's choice.
 - Test live updates with two drivers at once (`PHASE=coach &` and
   `PHASE=client &`, then `wait`).
 - It uses the real Supabase project: delete the accounts it creates
@@ -109,7 +112,7 @@ Pitfalls:
   (`/mcp` to log in).
 - **Schema changes:** add a new file in `supabase/migrations/`, then apply it
   with MCP `apply_migration` under the file's name minus the timestamp. Never
-  change it only in the dashboard. Migrations 1–9 and `seed.sql` are applied.
+  change it only in the dashboard. Migrations 1–13 and `seed.sql` are applied.
 - Test rules by impersonating a user in a rolled-back transaction:
   `set_config('request.jwt.claims', '{"sub": "<profile id>", "role": "authenticated"}', true)`,
   `set local role authenticated`, call the functions, end with
@@ -180,8 +183,29 @@ Pitfalls:
 - Public coaches are listed and receive requests. Private coaches aren't
   listed and invite by email. Switching to private declines waiting requests.
 - Menu badges: **Clients** is green for requests and red for expired
-  programs; **Calendar** is green for booking requests. Requests are green,
-  problems red.
+  programs; **Calendar** is green for booking requests; **Messages** is green
+  for unread messages. Requests are green, problems red.
+- **Messages work like WhatsApp:** one conversation per coaching; coach and
+  client write any time while it's active or paused. When it ends, both keep
+  the history read-only (a new coaching is a new conversation). No editing or
+  deleting sent messages (v1). WhatsApp ticks on own messages, for both
+  sides (in the bubble and before "You: …" in the list): clock = sending,
+  one tick = on the server, two = the other app received it (recorded when
+  it loads its conversations, so only while it's open until push exists),
+  blue (`Theme.receiptRead*`) = read. No "Seen" label, no switch to turn
+  read receipts off. Coach: two
+  panes, past clients in a collapsed section. Client: same layout, with past
+  coaches. Desktop: Enter sends, Shift+Enter new line. A pop-up (MessageToast)
+  shows a new message unless its chat is on screen.
+- The chat has a WhatsApp-style background: fitness doodles repeated
+  behind the messages (`MessageThread`, `Theme.chatPatternOpacity`). The
+  user supplied the artwork (`tools/chat_pattern/source.jpeg`, it doesn't
+  repeat by itself); `tools/chat_pattern.py` cuts out the doodles and
+  scatters them on a seamless tile in `assets/chat/` (needs numpy and scipy).
+- Messages are text only for now, built so images and voice can be added:
+  `messages.kind`, a future `message_attachments` table, files in Supabase
+  Storage (private bucket per coaching, signed URLs), uploads outside the
+  write queue.
 - **No banners on the coach's Clients page** (the user removed them). Leave
   the unused `expiredCount` property in `ClientsHome` unless asked.
 - **Exercises** is its own sidebar entry, not a tab in Programs.
@@ -189,6 +213,11 @@ Pitfalls:
 - Client tab names: **"My program"** and **"Calendar"**.
 - In the coach's calendar, clicking a session opens its details (no menu).
 - Default window 1920×1080, shrunk to fit smaller screens.
+- **Settings** is one page for both apps, opened from the bottom of the
+  sidebar (desktop) or the top bar (phone); it isn't a tab and covers the
+  current page until a tab is picked. For now only appearance: System /
+  Light / Dark, saved on the device (`AppSettings`, QSettings), not per
+  account. The login screen keeps its own light/dark button.
 - All stores are C++ (the user wants C++ and unit tests).
 - Exercise images come from **Open Exercise Art** (CC BY-SA 4.0), line
   drawings only: no muscle highlight. Dark lines in the light theme, light
@@ -204,21 +233,27 @@ Pitfalls:
 - The app doesn't credit Open Exercise Art on any screen yet (CC BY-SA needs
   it before release). Coaches can't pick a drawing for their own exercises.
 
-- Not designed: **Messages** (both apps) and **Progress** (client). The
-  client **Home** still uses `MockData`.
+- Not designed: **Progress** (client). The client **Home** still uses
+  `MockData` (except the coach's latest message). The coach dashboard's
+  "Unread messages" stat is still sample data.
+- Messages: no push notifications (Phase 6), no images or voice yet, no
+  search. Message text can't be selected or copied.
 - Clients get no notification or badge when the coach confirms, declines or
   cancels a booking, or accepts a request.
 - On phones the booking "Request" bar sits below the grid.
 - The **⋯** badge on confirmed sessions is left over from the old menu.
-  `SegmentedTabs` is unused.
 - Coaches can't edit their public profile (bio, price, …) in the app.
 - Dates are the device's local days; the server uses the coach's time zone.
   They differ only outside Europe/Rome.
-- Live updates reload the whole store on each notice. The directory of
+- Live updates reload the whole store on each notice (except MessageStore,
+  which fetches only new messages). The directory of
   public coaches isn't live. The coach's calendar loads all sessions at once
   (it needs paging by week).
 - Booking limits are written in both `CalendarStore` and the SQL functions,
   and must be changed in both.
+- The muscle tree is written in both `Exercise::muscleTree()` and the
+  `exercises_parts_per_muscle` check (every group needs one of its parts,
+  Cardio has none), and must be changed in both.
 
 ## Open product questions (ask, don't guess)
 

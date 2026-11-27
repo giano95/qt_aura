@@ -17,6 +17,14 @@ ScrollView {
 
     readonly property var coach: CoachStore.myCoach
     readonly property string coachName: coach ? coach.name : MockData.clientCoachName
+    // The conversation with the current coach, or null
+    readonly property var chat: MessageStore.currentConversation(MessageStore.revision)
+
+    function openChat() {
+        if (chat)
+            MessageStore.open(chat.id)
+        navigateRequested(messagesTab)
+    }
 
     readonly property bool twoColumns: availableWidth >= 860
     // The client's next confirmed or pending session (CalendarStore)
@@ -81,7 +89,7 @@ ScrollView {
             AuraButton {
                 variant: page.coach ? "secondary" : "primary"
                 text: page.coach ? qsTr("Message coach") : qsTr("Find a coach")
-                onClicked: page.navigateRequested(page.coach ? page.messagesTab : page.coachTab)
+                onClicked: page.coach ? page.openChat() : page.navigateRequested(page.coachTab)
             }
         }
 
@@ -300,6 +308,7 @@ ScrollView {
 
             // ---- latest message ----
             Card {
+                visible: page.chat !== null
                 title: qsTr("From your coach")
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -318,7 +327,8 @@ ScrollView {
                             font.weight: Font.DemiBold
                         }
                         Label {
-                            text: MockData.clientLatestMessage.time
+                            visible: text.length > 0
+                            text: page.chat ? MessageStore.listTime(page.chat.otherLastAt) : ""
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontSmall
                         }
@@ -326,17 +336,22 @@ ScrollView {
                 }
 
                 Label {
-                    text: MockData.clientLatestMessage.text
+                    text: page.chat && page.chat.otherLastBody.length > 0
+                          ? page.chat.otherLastBody
+                          : qsTr("No messages from %1 yet.").arg(page.coachName)
+                    color: page.chat && page.chat.otherLastBody.length > 0 ? Theme.text : Theme.textMuted
                     wrapMode: Text.Wrap
+                    maximumLineCount: 4
+                    elide: Text.ElideRight
                     lineHeight: 1.25
                     Layout.fillWidth: true
                 }
 
                 AuraButton {
                     variant: "ghost"
-                    text: qsTr("Reply →")
+                    text: page.chat && page.chat.otherLastBody.length > 0 ? qsTr("Reply →") : qsTr("Write a message →")
                     leftPadding: 0
-                    onClicked: page.navigateRequested(page.messagesTab)
+                    onClicked: page.openChat()
                 }
             }
         }

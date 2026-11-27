@@ -77,6 +77,19 @@ void Exercise::normalizeMuscles()
     subMuscles = parts;
 }
 
+QStringList Exercise::groupsMissingParts() const
+{
+    QStringList missing;
+    for (const auto &[group, groupParts] : muscleTree()) {
+        if (!muscles.contains(group) || groupParts.isEmpty())
+            continue;
+        if (std::none_of(groupParts.cbegin(), groupParts.cend(),
+                         [&](const QString &part) { return subMuscles.contains(part); }))
+            missing.append(group);
+    }
+    return missing;
+}
+
 QStringList Exercise::muscleTags() const
 {
     QStringList tags;

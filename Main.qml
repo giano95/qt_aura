@@ -102,4 +102,10 @@ ApplicationWindow {
             errorToast.show(message)
         }
     }
+    Connections {
+        target: MessageStore
+        function onErrorOccurred(message) {
+            errorToast.show(message)
+        }
+    }
 }

@@ -10,6 +10,10 @@ ScrollView {
 
     signal navigateRequested(int index)
 
+    // Coach app tab indices (see CoachHome)
+    readonly property int clientsTab: 1
+    readonly property int calendarTab: 2
+
     readonly property bool twoColumns: availableWidth >= 860
 
     contentWidth: availableWidth
@@ -34,7 +38,7 @@ ScrollView {
 
             AuraButton {
                 text: qsTr("Add client")
-                onClicked: page.navigateRequested(1)
+                onClicked: page.navigateRequested(page.clientsTab)
             }
         }
 
@@ -119,7 +123,7 @@ ScrollView {
                     variant: "ghost"
                     text: qsTr("Open calendar →")
                     leftPadding: 0
-                    onClicked: page.navigateRequested(2)
+                    onClicked: page.navigateRequested(page.calendarTab)
                 }
             }
 
@@ -171,7 +175,7 @@ ScrollView {
                     variant: "ghost"
                     text: qsTr("All clients →")
                     leftPadding: 0
-                    onClicked: page.navigateRequested(1)
+                    onClicked: page.navigateRequested(page.clientsTab)
                 }
             }
         }

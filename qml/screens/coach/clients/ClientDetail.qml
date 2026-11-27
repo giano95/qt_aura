@@ -20,6 +20,8 @@ Item {
 
     signal closeRequested()
     signal openProgramRequested(string programId, string clientName)
+    // Open the conversation with this client (the coaching's id)
+    signal messageRequested(string coachingId)
 
     function programExists(programId) {
         return ProgramStore.programs.some(p => p.id === programId)
@@ -126,6 +128,13 @@ Item {
                                 text: page.client ? qsTr("Client since %1").arg(Qt.formatDate(new Date(page.client.since), "MMM yyyy")) : ""
                             }
                         }
+                    }
+                    AuraButton {
+                        visible: page.client !== null && page.client.status !== "invited"
+                        Layout.alignment: Qt.AlignTop
+                        variant: "secondary"
+                        text: qsTr("Message")
+                        onClicked: page.messageRequested(page.clientId)
                     }
                     AuraButton {
                         visible: page.wide
